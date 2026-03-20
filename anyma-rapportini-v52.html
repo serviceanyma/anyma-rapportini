@@ -846,7 +846,7 @@ const T={
 
 // Traduzione tipi intervento IT→EN
 const TIPO_MAP={
-  'Support':'Support',
+  'Supporto':'Support',
   'Manutenzione Ordinaria':'Routine Maintenance',
   'Manutenzione Straordinaria':'Extraordinary Maintenance',
   'Guasto / Emergenza':'Breakdown / Emergency',
@@ -865,7 +865,7 @@ function translateTipo(tipo,lang){
 let db={
   clienti:[],
   tecnici:['Daniel Consolaro','Nelvio Rigon'],
-  tipi:['Support','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Formazione'],
+  tipi:['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Formazione'],
   rapportini:[],
   config:{
     azienda:'',email:'',firmaSalvata:'',
@@ -881,128 +881,6 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-
-// ── DATI DEMO (caricati solo se non mai inizializzati) ──────────────────────────────
-if(!localStorage.getItem('anyma_v14_initialized')){
-  localStorage.setItem('anyma_v14_initialized','1');
-  const oggi=new Date();
-  const d=(offset,h=0,m=0)=>{const x=new Date(oggi);x.setDate(x.getDate()+offset);x.setHours(h,m,0,0);return x.toISOString();};
-  const ds=(offset)=>{const x=new Date(oggi);x.setDate(x.getDate()+offset);return x.toISOString().split('T')[0];};
-  db.clienti=[
-    {id:'c1',nome:'Barilla G. e R. Fratelli S.p.A.',email:'manutenzione@barilla.com',tel:'+39 0521 2621',comune:'Parma',indirizzo:'Via Mantova 166',referente:'Ing. Russo'},
-    {id:'c2',nome:'Ferrero S.p.A.',email:'service@ferrero.com',tel:'+39 0173 313111',comune:'Alba (CN)',indirizzo:'Piazzale Pietro Ferrero 1',referente:'Dr. Mancini'},
-    {id:'c3',nome:'Colussi S.p.A.',email:'tecnico@colussi.it',tel:'+39 0734 81251',comune:'San Severino Marche',indirizzo:'Via Garibaldi 99',referente:'Sig. Bertolini'},
-    {id:'c4',nome:'Perfetti Van Melle',email:'maintenance@pvmitaly.com',tel:'+39 0331 693111',comune:'Lainate (MI)',indirizzo:'Via XXV Aprile 7',referente:'Ing. De Luca'},
-    {id:'c5',nome:'Rana S.p.A.',email:'assistenza@rana.it',tel:'+39 045 6700111',comune:'San Giovanni Lupatoto',indirizzo:'Via Longhini 1',referente:'Sig.ra Fontana'},
-  ];
-  db.rapportini=[
-    // ── Barilla 1 – completato inviato 3 gg fa ──
-    {id:'rt01',numRT:'RT_20260317093000',cliente:'Barilla G. e R. Fratelli S.p.A.',clienteEmail:'manutenzione@barilla.com',
-     tecnici:'Daniel Consolaro',tipo:'Manutenzione Ordinaria',stato:'Inviato',lang:'IT',isPrelim:false,
-     dataCreazione:d(-3,9,30),
-     attivita:'Eseguita manutenzione ordinaria linea flowpack n.3.\nSostituzione lame e contro-lame saldante trasversale.\nVerifica e registrazione catena di trasporto.\nTest di produzione con esito positivo.',
-     attivitaEN:'Ordinary maintenance carried out on flowpack line no. 3.\nReplacement of transverse sealing blades and counter-blades.\nCheck and adjustment of the conveyor chain.\nProduction test with positive result.',
-     giornate:[
-       {data:ds(-4),vAnDa:'07:00',vAnA:'09:30',lavDa:'10:00',lavA:'17:30',pausaPranzo:60,pausaCena:0,
-        vRetDa:'18:00',vRetA:'20:30',pranzo:true,cena:false,pernotto:false,
-        oreLav:'7.5',oreViag:'5.0',km:280},
-       {data:ds(-3),vAnDa:'',vAnA:'',lavDa:'08:00',lavA:'13:00',pausaPranzo:0,pausaCena:0,
-        vRetDa:'13:30',vRetA:'16:00',pranzo:false,cena:false,pernotto:false,
-        oreLav:'5.0',oreViag:'2.5',km:0}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:4,emailCC:[]},
-
-    // ── Ferrero 1 – guasto emergenza settimana scorsa ──
-    {id:'rt02',numRT:'RT_20260312141500',cliente:'Ferrero S.p.A.',clienteEmail:'service@ferrero.com',
-     tecnici:'Nelvio Rigon',tipo:'Guasto / Emergenza',stato:'Inviato',lang:'IT',isPrelim:false,
-     dataCreazione:d(-8,14,15),
-     attivita:'Intervento d\'urgenza per blocco confezionatrice Tecnopack T5.\nDiagnosi: rottura cinghia dentata gruppo avanzamento film.\nSostituzione cinghia e tensionatori.\nRipristino produzione entro 4 ore dall\'intervento.',
-     giornate:[
-       {data:ds(-8),vAnDa:'06:00',vAnA:'09:30',lavDa:'10:00',lavA:'18:30',pausaPranzo:30,pausaCena:0,
-        vRetDa:'19:00',vRetA:'22:30',pranzo:true,cena:false,pernotto:false,
-        oreLav:'8.0',oreViag:'7.0',km:350}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:2,emailCC:[]},
-
-    // ── Colussi – installazione 2 settimane fa ──
-    {id:'rt03',numRT:'RT_20260306091000',cliente:'Colussi S.p.A.',clienteEmail:'tecnico@colussi.it',
-     tecnici:'Daniel Consolaro, Nelvio Rigon',tipo:'Installazione',stato:'Inviato',lang:'IT',isPrelim:false,
-     dataCreazione:d(-14,9,10),
-     attivita:'Installazione e collaudo nuova linea confezionamento IFP mod. EVO 450.\nCollegamenti elettrici quadro principale e ausiliari.\nParametrizzazione PLC Omron NX1P2.\nFormazione operatori (3 persone) su utilizzo e cambio formato.\nProduzione test con 3 formati differenti: esito positivo su tutti.',
-     giornate:[
-       {data:ds(-16),vAnDa:'06:30',vAnA:'10:00',lavDa:'10:30',lavA:'18:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'',vRetA:'',pranzo:true,cena:true,pernotto:true,oreLav:'7.5',oreViag:'3.5',km:420},
-       {data:ds(-15),vAnDa:'',vAnA:'',lavDa:'08:00',lavA:'18:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'',vRetA:'',pranzo:true,cena:true,pernotto:true,oreLav:'10.0',oreViag:'0',km:0},
-       {data:ds(-14),vAnDa:'',vAnA:'',lavDa:'08:00',lavA:'15:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'16:00',vRetA:'19:30',pranzo:true,cena:false,pernotto:false,oreLav:'7.0',oreViag:'3.5',km:420}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:9,emailCC:[]},
-
-    // ── Perfetti – manutenzione straordinaria 1 mese fa ──
-    {id:'rt04',numRT:'RT_20260220083000',cliente:'Perfetti Van Melle',clienteEmail:'maintenance@pvmitaly.com',
-     tecnici:'Daniel Consolaro',tipo:'Manutenzione Straordinaria',stato:'Inviato',lang:'EN',isPrelim:false,
-     dataCreazione:d(-28,8,30),
-     attivita:'Extraordinary maintenance on DMPack DM300 wrapping machine.\nReplacement of sealing group (upper and lower jaws).\nOverhaul of the film feeding unit: rollers, guides and tension springs.\nElectrical cabinet inspection: replacement of 3 faulty contactors.',
-     giornate:[
-       {data:ds(-29),vAnDa:'05:30',vAnA:'09:00',lavDa:'09:30',lavA:'18:30',pausaPranzo:60,pausaCena:0,
-        vRetDa:'',vRetA:'',pranzo:true,cena:true,pernotto:true,oreLav:'9.0',oreViag:'3.5',km:310},
-       {data:ds(-28),vAnDa:'',vAnA:'',lavDa:'08:00',lavA:'16:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'16:30',vRetA:'20:00',pranzo:true,cena:false,pernotto:false,oreLav:'8.0',oreViag:'3.5',km:310}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:6,emailCC:[]},
-
-    // ── Rana – support aperto (in corso) ──
-    {id:'rt05',numRT:'RT_20260319103000',cliente:'Rana S.p.A.',clienteEmail:'assistenza@rana.it',
-     tecnici:'Nelvio Rigon',tipo:'Support',stato:'Aperto',lang:'IT',isPrelim:true,
-     dataCreazione:d(-1,10,30),
-     attivita:'Verifica anomalia sensore presenza prodotto su linea PFM Pratika 1.\nTestata catena encoder e scheda I/O: nessun guasto hardware rilevato.\nAggiornamento firmware HMI alla versione 4.2.1.\nAnomalìa persiste — necessario secondo accesso per analisi software avanzata.',
-     giornate:[
-       {data:ds(-1),vAnDa:'08:00',vAnA:'09:45',lavDa:'10:30',lavA:'17:30',pausaPranzo:60,pausaCena:0,
-        vRetDa:'18:00',vRetA:'19:45',pranzo:true,cena:false,pernotto:false,
-        oreLav:'7.0',oreViag:'3.5',km:195}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:1,emailCC:[]},
-
-    // ── Barilla 2 – bozza da completare ──
-    {id:'rt06',numRT:'RT_20260318150000',cliente:'Barilla G. e R. Fratelli S.p.A.',clienteEmail:'manutenzione@barilla.com',
-     tecnici:'Daniel Consolaro',tipo:'Support',stato:'Bozza',lang:'IT',isPrelim:false,
-     dataCreazione:d(-2,15,0),
-     attivita:'Sopralluogo preventivo per sostituzione gruppo saldante flowpack n.1.',
-     giornate:[
-       {data:ds(-2),vAnDa:'13:00',vAnA:'15:00',lavDa:'15:30',lavA:'18:00',pausaPranzo:0,pausaCena:0,
-        vRetDa:'18:30',vRetA:'20:30',pranzo:false,cena:false,pernotto:false,
-        oreLav:'2.5',oreViag:'4.0',km:280}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:0,emailCC:[]},
-
-    // ── Ferrero 2 – collaudo questo mese ──
-    {id:'rt07',numRT:'RT_20260310083000',cliente:'Ferrero S.p.A.',clienteEmail:'service@ferrero.com',
-     tecnici:'Daniel Consolaro, Nelvio Rigon',tipo:'Collaudo',stato:'Completato',lang:'IT',isPrelim:false,
-     dataCreazione:d(-10,8,30),
-     attivita:'Collaudo finale linea avvolgitrice Minipack Torre mod. PRATIKA M60.\nVerifica conformità CE documentazione tecnica.\nTest ciclo automatico con 5 formati: tutti conformi alle tolleranze.\nRedazione verbale di collaudo firmato dal responsabile qualità cliente.',
-     giornate:[
-       {data:ds(-10),vAnDa:'06:00',vAnA:'09:30',lavDa:'10:00',lavA:'17:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'17:30',vRetA:'21:00',pranzo:true,cena:false,pernotto:false,
-        oreLav:'7.0',oreViag:'7.0',km:350}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:5,emailCC:[]},
-
-    // ── Colussi – formazione ──
-    {id:'rt08',numRT:'RT_20260228093000',cliente:'Colussi S.p.A.',clienteEmail:'tecnico@colussi.it',
-     tecnici:'Daniel Consolaro',tipo:'Formazione',stato:'Inviato',lang:'IT',isPrelim:false,
-     dataCreazione:d(-20,9,30),
-     attivita:'Corso formazione operatori su nuova macchina IFP EVO 450 (follow-up installazione).\nApprofondimento: gestione allarmi, cambio formato senza attrezzi, pulizia e lubrificazione.\n5 operatori formati, test finale superato da tutti.\nRilasciata dispensa operativa personalizzata.',
-     giornate:[
-       {data:ds(-20),vAnDa:'06:30',vAnA:'10:00',lavDa:'10:30',lavA:'17:00',pausaPranzo:60,pausaCena:0,
-        vRetDa:'17:30',vRetA:'21:00',pranzo:true,cena:false,pernotto:false,
-        oreLav:'6.5',oreViag:'7.0',km:420}
-     ],
-     firmaTec:'',firmaCli:'',fotoCount:3,emailCC:[]},
-  ];
-  db.nextRT=9;
-  saveDB();
-}
 
 // ══════════════════════════════════════
 // STATE
