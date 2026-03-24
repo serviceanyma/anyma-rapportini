@@ -127,6 +127,14 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 
 /* GIORNATA */
 .gc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.gpills{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px}
+.gpill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:20px;font-size:13px;font-weight:600;letter-spacing:.2px;white-space:nowrap}
+.gpill-ora{background:rgba(139,26,26,.15);color:var(--cr2);border:1px solid var(--crg)}
+.gpill-lav{background:rgba(139,26,26,.1);color:var(--cr3);border:1px solid var(--crg)}
+.gpill-viag{background:rgba(243,156,18,.1);color:var(--warn);border:1px solid rgba(243,156,18,.3)}
+.gpill-km{background:rgba(255,255,255,.06);color:var(--tx2);border:1px solid var(--b2)}
+.gpill-ind{background:rgba(76,175,80,.1);color:#81c784;border:1px solid rgba(76,175,80,.25)}
+.gpill-empty{background:transparent;color:var(--tx3);border:1px solid var(--b1)}
 .gh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .gn{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--tx3);text-transform:uppercase}
 .delbtn{width:28px;height:28px;border-radius:var(--rs);background:rgba(192,57,43,.08);color:var(--cr2);border:1px solid var(--crg);cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -1285,23 +1293,32 @@ function renderGio(){
   document.getElementById('gioList').innerHTML=gio.map((g,i)=>{
     const ol=g.oreLav||0;
     const ov=g.oreViag||0;
-    // Header summary (sempre visibile)
-    const sommario=g.lavDa&&g.lavA
-      ? `${g.lavDa}–${g.lavA} · ${ol}h lav. · ${ov}h viag. · ${g.km||0}km`
-      : 'Tocca per inserire orari';
     const isOpen=g._open!==false; // default aperta la prima
+
+    // Summary collassato: pill con dati chiave
+    const hasData=g.lavDa||g.lavA||parseFloat(ol)>0;
+    const pillOra=g.lavDa&&g.lavA
+      ?`<span class="gpill gpill-ora">⏱ ${g.lavDa}–${g.lavA}</span>`
+      :`<span class="gpill gpill-empty">⏱ —</span>`;
+    const pillLav=`<span class="gpill ${parseFloat(ol)>0?'gpill-lav':'gpill-empty'}">🔧 ${parseFloat(ol).toFixed(1)}h</span>`;
+    const pillViag=parseFloat(ov)>0?`<span class="gpill gpill-viag">🚗 ${parseFloat(ov).toFixed(1)}h</span>`:'';
+    const pillKm=parseInt(g.km||0)>0?`<span class="gpill gpill-km">📍 ${g.km}km</span>`:'';
+    const pillPranzo=g.pranzo?`<span class="gpill gpill-ind">🥗</span>`:'';
+    const pillCena=g.cena?`<span class="gpill gpill-ind">🍽</span>`:'';
+    const pillPern=g.pernotto?`<span class="gpill gpill-ind">🏨</span>`:'';
+    const summaryPills=`<div class="gpills">${pillOra}${pillLav}${pillViag}${pillKm}${pillPranzo}${pillCena}${pillPern}</div>`;
+
     return `
     <div class="gc" id="gc_${i}">
       <!-- HEADER accordion — sempre visibile -->
       <div onclick="toggleG(${i})" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;padding:2px 0 ${isOpen?'12px':'0'}">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="gn">📅 ${g.data||'—'}</span>
-          ${g.pranzo?'<span style="font-size:10px;background:var(--crd);color:var(--cr3);padding:1px 7px;border-radius:10px">🥗</span>':''}
-          ${g.cena?'<span style="font-size:10px;background:var(--crd);color:var(--cr3);padding:1px 7px;border-radius:10px">🍽</span>':''}
-          ${g.pernotto?'<span style="font-size:10px;background:var(--crd);color:var(--cr3);padding:1px 7px;border-radius:10px">🏨</span>':''}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isOpen?'0':'6px'}">
+            <span class="gn" style="font-size:15px">📅 ${g.data||'—'}</span>
+          </div>
+          ${!isOpen?summaryPills:''}
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;color:var(--tx3)" class="acc-sum">${sommario}</span>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:8px;flex-shrink:0">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" style="transition:transform .2s;transform:rotate(${isOpen?180:0}deg)" id="arr_${i}"><polyline points="6 9 12 15 18 9"/></svg>
           <button class="delbtn" onclick="event.stopPropagation();delG(${i})" ${gio.length<=1?'disabled style="opacity:.3"':''}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1392,10 +1409,22 @@ function toggleG(i){
   gio[i]._open=!gio[i]._open;
   const body=document.getElementById('gbody_'+i);
   const arr=document.getElementById('arr_'+i);
+  const gc=document.getElementById('gc_'+i);
   const header=body?.previousElementSibling;
   if(body) body.style.display=gio[i]._open?'block':'none';
   if(arr) arr.style.transform=`rotate(${gio[i]._open?180:0}deg)`;
   if(header) header.style.paddingBottom=gio[i]._open?'12px':'0';
+  // Mostra/nasconde pills nel collasso
+  if(gc){
+    let pillsEl=gc.querySelector('.gpills');
+    if(gio[i]._open){
+      if(pillsEl) pillsEl.style.display='none';
+    } else {
+      if(!pillsEl){renderGio();return;} // fallback: re-render completo
+      pillsEl.style.display='flex';
+      recalc(i); // aggiorna i valori
+    }
+  }
 }
 
 // Aggiorna solo l'header della giornata senza re-render completo
@@ -1456,16 +1485,24 @@ function recalc(i){
   // Update calc displays
   const dol=document.getElementById(`cd_ol_${i}`);if(dol)dol.textContent=ol;
   const dov=document.getElementById(`cd_ov_${i}`);if(dov)dov.textContent=ov;
-  // Update header summary
+  // Update header summary pills (solo se collassata)
   const gc=document.getElementById(`gc_${i}`);
-  if(gc){
-    const sumEl=gc.querySelector('.acc-sum');
-    if(sumEl){
-      const sommario=g.lavDa&&g.lavA
-        ?`${g.lavDa}–${g.lavA} · ${ol}h lav. · ${ov}h viag. · ${g.km||0}km`
-        :'Tocca per inserire orari';
-      sumEl.textContent=sommario;
-    }
+  if(gc&&!gio[i]._open){
+    // Ri-render solo le pills senza full re-render
+    const g2=gio[i];
+    const ol2=g2.oreLav||0;
+    const ov2=g2.oreViag||0;
+    const pillOra=g2.lavDa&&g2.lavA
+      ?`<span class="gpill gpill-ora">⏱ ${g2.lavDa}–${g2.lavA}</span>`
+      :`<span class="gpill gpill-empty">⏱ —</span>`;
+    const pillLav=`<span class="gpill ${parseFloat(ol2)>0?'gpill-lav':'gpill-empty'}">🔧 ${parseFloat(ol2).toFixed(1)}h</span>`;
+    const pillViag=parseFloat(ov2)>0?`<span class="gpill gpill-viag">🚗 ${parseFloat(ov2).toFixed(1)}h</span>`:'';
+    const pillKm=parseInt(g2.km||0)>0?`<span class="gpill gpill-km">📍 ${g2.km}km</span>`:'';
+    const pillPranzo=g2.pranzo?`<span class="gpill gpill-ind">🥗</span>`:'';
+    const pillCena=g2.cena?`<span class="gpill gpill-ind">🍽</span>`:'';
+    const pillPern=g2.pernotto?`<span class="gpill gpill-ind">🏨</span>`:'';
+    const pEl=gc.querySelector('.gpills');
+    if(pEl) pEl.innerHTML=pillOra+pillLav+pillViag+pillKm+pillPranzo+pillCena+pillPern;
   }
   // Overlap check
   const errs=valG(g,i);
