@@ -1152,25 +1152,35 @@ function archiviaRT(id){
   r._archiviato=!r._archiviato;
   saveDB();
   toast(r._archiviato?'📦 Archiviato':'↩ Rimosso dall\'archivio','suc');
+  // Salva flag su SP in background
+  if(m365Token&&r._spId) spSaveRapportino(r).catch(e=>console.warn('SP arch:',e));
   renderHome();
 }
 
 function eliminaRT(id){
-  const wrap=document.getElementById('sw_'+id);
-  if(!confirm('Eliminare questo rapportino dalla lista locale?\n(Rimane su SharePoint)')) {
-    // Ripristina posizione se annullato
-    if(wrap){
-      const el=document.getElementById('si_'+id);
-      if(el){el.style.transform='translateX(0)';}
-      const bgD=document.getElementById('bgD_'+id);
-      if(bgD)bgD.style.opacity='0';
-    }
+  const r=db.rapportini.find(x=>x.id===id);
+  if(!r){renderHome();return;}
+  const spId=r._spId;
+  const nome=r.numRT+' - '+(r.cliente||'');
+  if(!confirm(`Eliminare definitivamente "${nome}"?\n\nVERRÀ ELIMINATO ANCHE DA SHAREPOINT.\nAzione irreversibile.`)){
+    // Ripristina posizione
+    const el=document.getElementById('si_'+id);
+    if(el){el.style.transform='translateX(0)';}
+    const bgD=document.getElementById('bgD_'+id);
+    if(bgD)bgD.style.opacity='0';
     return;
   }
+  // Elimina da locale
   db.rapportini=db.rapportini.filter(x=>x.id!==id);
   saveDB();
-  toast('🗑 Eliminato dalla lista','wrn');
+  toast('🗑 Eliminato','wrn');
   renderHome();
+  // Elimina da SP in background
+  if(m365Token&&spId){
+    spDeleteRapportino(spId)
+      .then(()=>toast('✓ Eliminato anche da SharePoint','suc'))
+      .catch(e=>toast('⚠️ Errore SP: '+e.message,'err'));
+  }
 }
 
 // ══════════════════════════════════════
@@ -2721,6 +2731,7 @@ const SP_SCHEMA = [
   {n:'OreViaggio',    t:'number',  d:'Ore Viaggio'},
   {n:'KMTotali',      t:'number',  d:'KM Totali'},
   {n:'Preliminare',   t:'boolean', d:'Preliminare'},
+  {n:'Archiviato',    t:'boolean', d:'Archiviato'},
   {n:'PDFUrl',        t:'text',    d:'PDF URL'},
   {n:'NumFoto',       t:'number',  d:'Numero Foto'},
 ];
@@ -2849,6 +2860,7 @@ function spItemToRT(item){
     attivita:     f.AttivitaIT||'',
     attivitaEN:   f.AttivitaEN||'',
     isPrelim:     f.Preliminare===true||f.Preliminare==='true',
+    _archiviato:  f.Archiviato===true||f.Archiviato==='true',
     dataCreazione:f.DataIntervento||item.createdDateTime||new Date().toISOString(),
     giornate,
     fotoCount:    parseInt(f.NumFoto||0),
@@ -2883,6 +2895,7 @@ function rtToSPFields(rt){
     OreViaggio:     totViag,
     KMTotali:       totKm,
     Preliminare:    rt.isPrelim||false,
+    Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
     NumFoto:        rt.fotoCount||0,
   };
