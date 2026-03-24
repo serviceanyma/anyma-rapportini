@@ -1810,16 +1810,153 @@ function renderPreview(containerId){
   const mobileW=Math.min(window.innerWidth-30,750);
   const scale=mobileW/750;
   container.innerHTML=
-    `<div style="display:flex;justify-content:center">
-      <div style="width:${mobileW}px;height:${Math.round(1060*scale)}px;overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
-        <div style="width:750px;transform:scale(${scale});transform-origin:top left;background:white">
-          ${getPDFStyles()}${html}
-        </div>
+    `<div id="pz_${containerId}" style="overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5);touch-action:none;cursor:grab">
+      <div id="pz_inner_${containerId}" style="width:750px;transform-origin:top left;transform:scale(${scale});background:white;will-change:transform">
+        ${getPDFStyles()}${html}
       </div>
     </div>`;
+  // Aggiusta altezza wrapper dopo render
+  const inner=document.getElementById(`pz_inner_${containerId}`);
+  const wrap=document.getElementById(`pz_${containerId}`);
+  requestAnimationFrame(()=>{
+    const h=inner.scrollHeight*scale;
+    wrap.style.height=h+'px';
+    wrap.style.width=mobileW+'px';
+    wrap.style.margin='0 auto';
+  });
+  initPinchZoom(containerId);
 }
 
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+// PINCH-TO-ZOOM per anteprime PDF
+// ══════════════════════════════════════
+function initPinchZoom(containerId){
+  const wrap=document.getElementById('pz_'+containerId);
+  const inner=document.getElementById('pz_inner_'+containerId);
+  if(!wrap||!inner) return;
+
+  const mobileW=Math.min(window.innerWidth-30,750);
+  const baseScale=mobileW/750;
+  const minScale=baseScale;
+  const maxScale=baseScale*4;
+
+  let curScale=baseScale;
+  let tx=0, ty=0;           // traslazione corrente
+  let lastDist=0;           // distanza pinch precedente
+  let lastMidX=0,lastMidY=0; // punto medio pinch precedente
+  let isDragging=false;
+  let dragStartX=0,dragStartY=0;
+  let dragStartTx=0,dragStartTy=0;
+
+  function applyTransform(){
+    inner.style.transform=`scale(${curScale}) translate(${tx/curScale}px,${ty/curScale}px)`;
+    // Aggiorna altezza wrapper
+    wrap.style.height=(inner.scrollHeight*curScale)+'px';
+  }
+
+  function dist(t){
+    const dx=t[0].clientX-t[1].clientX;
+    const dy=t[0].clientY-t[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  function mid(t){
+    return {
+      x:(t[0].clientX+t[1].clientX)/2,
+      y:(t[0].clientY+t[1].clientY)/2
+    };
+  }
+
+  // ── Touch events ──
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      lastDist=dist(e.touches);
+      const m=mid(e.touches);
+      lastMidX=m.x; lastMidY=m.y;
+    } else if(e.touches.length===1&&curScale>baseScale){
+      isDragging=true;
+      dragStartX=e.touches[0].clientX;
+      dragStartY=e.touches[0].clientY;
+      dragStartTx=tx; dragStartTy=ty;
+      wrap.style.cursor='grabbing';
+    }
+  },{passive:false});
+
+  wrap.addEventListener('touchmove',e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      const d=dist(e.touches);
+      const m=mid(e.touches);
+      const ratio=d/lastDist;
+      const newScale=Math.max(minScale,Math.min(maxScale,curScale*ratio));
+      // Zoom centrato sul punto medio delle dita
+      const wRect=wrap.getBoundingClientRect();
+      const pinchX=m.x-wRect.left;
+      const pinchY=m.y-wRect.top;
+      tx=pinchX-(pinchX-tx)*(newScale/curScale);
+      ty=pinchY-(pinchY-ty)*(newScale/curScale);
+      // Limita traslazione
+      tx=Math.min(0,Math.max(tx,mobileW-750*newScale));
+      ty=Math.min(0,ty);
+      curScale=newScale;
+      lastDist=d; lastMidX=m.x; lastMidY=m.y;
+      applyTransform();
+    } else if(e.touches.length===1&&isDragging){
+      e.preventDefault();
+      const dx=e.touches[0].clientX-dragStartX;
+      const dy=e.touches[0].clientY-dragStartY;
+      tx=Math.min(0,Math.max(dragStartTx+dx, mobileW-750*curScale));
+      ty=Math.min(0,dragStartTy+dy);
+      applyTransform();
+    }
+  },{passive:false});
+
+  wrap.addEventListener('touchend',e=>{
+    if(e.touches.length<2) lastDist=0;
+    if(e.touches.length===0){
+      isDragging=false;
+      wrap.style.cursor='grab';
+      // Se zoom sotto il minimo → reset
+      if(curScale<=baseScale+0.01){
+        curScale=baseScale; tx=0; ty=0;
+        applyTransform();
+      }
+    }
+  });
+
+  // ── Mouse wheel zoom (desktop) ──
+  wrap.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const delta=e.deltaY<0?1.1:0.9;
+    const wRect=wrap.getBoundingClientRect();
+    const mx=e.clientX-wRect.left;
+    const my=e.clientY-wRect.top;
+    const newScale=Math.max(minScale,Math.min(maxScale,curScale*delta));
+    tx=mx-(mx-tx)*(newScale/curScale);
+    ty=my-(my-ty)*(newScale/curScale);
+    tx=Math.min(0,Math.max(tx,mobileW-750*newScale));
+    ty=Math.min(0,ty);
+    curScale=newScale;
+    applyTransform();
+  },{passive:false});
+
+  // Doppio tap → reset zoom
+  let lastTap=0;
+  wrap.addEventListener('touchend',e=>{
+    if(e.changedTouches.length===1){
+      const now=Date.now();
+      if(now-lastTap<300){
+        curScale=baseScale; tx=0; ty=0;
+        inner.style.transition='transform .3s';
+        applyTransform();
+        setTimeout(()=>inner.style.transition='',300);
+      }
+      lastTap=now;
+    }
+  });
+}
+
 // GENERATE REAL PDF (jsPDF + html2canvas) — pagine A4 dinamiche
 
 
@@ -2152,13 +2289,18 @@ function openDet(id){
   const scale=mobileW/750;
   const html=buildPDFHTML(rt,rt.giornate||[],rt.firmaTec||'',rt.firmaCli||'',rt.isPrelim||false,rt.lang||'IT');
   document.getElementById('detContent').innerHTML=
-    `<div style="display:flex;justify-content:center">
-      <div style="width:${mobileW}px;height:${Math.round(1060*scale)}px;overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
-        <div style="width:750px;transform:scale(${scale});transform-origin:top left;background:white">
-          ${getPDFStyles()}${html}
-        </div>
+    `<div id="pz_detContent" style="overflow:hidden;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5);touch-action:none;cursor:grab;width:${mobileW}px;margin:0 auto">
+      <div id="pz_inner_detContent" style="width:750px;transform-origin:top left;transform:scale(${scale});background:white;will-change:transform">
+        ${getPDFStyles()}${html}
       </div>
     </div>`;
+  const inner=document.getElementById('pz_inner_detContent');
+  const wrap=document.getElementById('pz_detContent');
+  requestAnimationFrame(()=>{
+    const h=inner.scrollHeight*scale;
+    wrap.style.height=h+'px';
+  });
+  initPinchZoom('detContent');
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   showScr('scrDet');
 }
