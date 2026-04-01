@@ -3878,4 +3878,14 @@ async function autoSyncOnLogin(){
     await Promise.allSettled([syncSPEmails(),spSyncClienti()]);
 
     // 5. Done
-    setBar(`Shar
+    setBar(`SharePoint — ${nRT} rapportini · ${db.clienti.length} clienti`,'var(--ok)');
+
+  }catch(e){
+    console.warn('AutoSync error:',e);
+    setBar('Errore sincronizzazione — dati offline','var(--cr2)');
+  }
+}
+
+</script>
+</body>
+</html>
