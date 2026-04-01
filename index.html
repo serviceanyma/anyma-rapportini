@@ -226,7 +226,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   position:fixed;left:-9999px;top:0;
   width:750px;
   background:white;
-  font-family:Arial,Helvetica,sans-serif;
+  font-family:'Barlow Condensed',Helvetica,sans-serif;
   font-size:9pt;
   color:#222;
   line-height:1.4;
@@ -266,7 +266,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 .pdf-sig img{max-width:180px;height:auto;display:block;margin:0 auto 4px}
 .pdf-sig-empty{height:55px}
 /* Watermark */
-.pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:Arial;letter-spacing:6px;z-index:1}
+.pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow Condensed';letter-spacing:6px;z-index:1}
 </style>
 </head>
 <body>
@@ -2015,7 +2015,7 @@ async function generatePDF(rt,gd,fT,fC){
 function getPDFStyles(){
   return `<style>
     @page{size:A4 portrait;margin:20px}
-    #pdfTemplate,#pdfTemplate *{font-family:Arial,Helvetica,sans-serif!important}
+    #pdfTemplate,#pdfTemplate *{font-family:'Barlow',Helvetica,sans-serif!important}
     .pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:9pt;color:#222;box-sizing:border-box}
     .pdf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #8B1A1A;padding-bottom:8px;margin-bottom:10px}
     .pdf-logo-img{max-width:220px;height:auto;flex-shrink:0}
@@ -2037,7 +2037,7 @@ function getPDFStyles(){
     .pdf-sig-line{border-top:1px solid #000;padding-top:4px;font-size:9pt;color:#333;margin-top:2px}
     .pdf-sig img{max-width:180px;height:auto;display:block;margin:0 auto 4px}
     .pdf-sig-empty{height:55px}
-    .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:Arial;letter-spacing:6px;z-index:1}
+    .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow';letter-spacing:6px;z-index:1}
   </style>`;
 }
 
