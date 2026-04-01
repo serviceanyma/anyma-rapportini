@@ -881,7 +881,7 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v82';
+const APP_VERSION='v83';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -2164,7 +2164,13 @@ async function inviaEmailViaPA(rt, toList){
     // 2. Genera HTML del rapportino
     const fT=rt.firmaTec||'';
     const fC=rt.firmaCli||'';
-    const htmlContent=getPDFStyles(true)+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
+    // Genera HTML per PA - usa font di sistema, rimuove ogni traccia di Google Fonts
+    let htmlContent=getPDFStyles(true)+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
+    // Sanitizza: elimina qualsiasi riferimento residuo a Barlow o Google Fonts
+    htmlContent=htmlContent.replace(/@import[^;]+googleapis[^;]+;/g,'');
+    // Sostituisce font-family con Barlow → Calibri (sia CSS che inline style)
+    htmlContent=htmlContent.replace(/font-family\s*:\s*['"]?Barlow[^;}"']*['"]?/gi,"font-family:'Calibri','Segoe UI',Arial,sans-serif");
+    htmlContent=htmlContent.replace(/font-family\s*:\s*(['"]?Calibri[^;}"']*['"]?)\s*!important/gi,"font-family:$1!important");
     const dataRT=rt.giornate?.[0]?.data||rt.dataCreazione?.split('T')[0]||new Date().toISOString().split('T')[0];
 
     // 3. Costruisce il payload JSON per PA
