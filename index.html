@@ -881,7 +881,7 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v84';
+const APP_VERSION='v87';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -1201,7 +1201,7 @@ function eliminaRT(id){
 // NUOVO RT
 // ══════════════════════════════════════
 const genRT=()=>{const d=new Date();return 'RT_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');};
-const today=()=>new Date().toISOString().split('T')[0];
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false});
 
 function nuovoRT(){
@@ -1543,7 +1543,7 @@ function addG(){
     // Oggi c'è già → giorno successivo all'ultima giornata
     const d=new Date(last.data+'T12:00:00');
     d.setDate(d.getDate()+1);
-    g.data=d.toISOString().split('T')[0];
+    g.data=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
   g._open=true;
   gio.forEach(x=>x._open=false);
@@ -1688,6 +1688,8 @@ function salvaCfgF(){
 function getFT(){
   if(usaSalvata&&db.config.firmaSalvata)return db.config.firmaSalvata;
   if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL();
+  // Fallback: se c'è firma salvata usala anche se non esplicitamente selezionata
+  if(db.config.firmaSalvata)return db.config.firmaSalvata;
   return '';
 }
 function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL();return '';}
@@ -1717,8 +1719,8 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
       <td class="tdl" style="white-space:nowrap">${g.data}</td>
       <td>${g.lavDa||''}</td>
       <td>${g.lavA||''}</td>
-      <td style="font-size:7.5pt;color:#666">${g.pausaPranzo?g.pausaPranzo+"'":'—'}</td>
-      <td style="font-size:7.5pt;color:#666">${g.pausaCena?g.pausaCena+"'":'—'}</td>
+      <td style="font-size:8.5pt;color:#666">${g.pausaPranzo?g.pausaPranzo+"'":'—'}</td>
+      <td style="font-size:8.5pt;color:#666">${g.pausaCena?g.pausaCena+"'":'—'}</td>
       <td><b>${g.oreLav||0}</b></td>
       <td>${g.pranzo?chk:''}</td><td>${g.cena?chk:''}</td><td>${g.pernotto?chk:''}</td>
       <td>${g.oreViag||0}</td><td>${g.km||0}</td>
@@ -2032,25 +2034,25 @@ function getPDFStyles(forExport=false){
     ${fontImport}
     @page{size:A4 portrait;margin:20px}
     #pdfTemplate,#pdfTemplate *{font-family:${fontMain}!important}
-    .pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:9pt;color:#222;box-sizing:border-box}
+    .pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:10pt;color:#222;box-sizing:border-box}
     .pdf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #8B1A1A;padding-bottom:8px;margin-bottom:10px}
     .pdf-logo-img{max-width:220px;height:auto;flex-shrink:0}
-    .pdf-company{font-size:8pt;color:#444;line-height:1.5;text-align:right;white-space:nowrap;flex-shrink:0}
-    .pdf-company strong{font-size:9pt;color:#222;display:block}
+    .pdf-company{font-size:9pt;color:#444;line-height:1.5;text-align:right;white-space:nowrap;flex-shrink:0}
+    .pdf-company strong{font-size:10pt;color:#222;display:block}
     .pdf-boxes{display:flex;gap:16px;margin-top:10px;margin-bottom:10px}
-    .pdf-box{flex:1;border:1px solid #ccc;padding:12px 14px;font-size:9pt;line-height:1.6;border-radius:8px}
-    .pdf-sec{font-weight:700;font-size:10pt;color:#8B1A1A;border-bottom:1px solid #8B1A1A;padding-bottom:4px;margin:14px 0 6px}
-    .pdf-tbl{width:100%;border-collapse:collapse;font-size:8pt;margin-top:6px;word-wrap:break-word}
-    .pdf-tbl th{background:#8B1A1A;color:white;padding:5px 4px;text-align:center;border:1px solid #a83226;font-size:7.5pt;font-weight:700}
+    .pdf-box{flex:1;border:1px solid #ccc;padding:12px 14px;font-size:10pt;line-height:1.6;border-radius:8px}
+    .pdf-sec{font-weight:700;font-size:11pt;color:#8B1A1A;border-bottom:1px solid #8B1A1A;padding-bottom:4px;margin:14px 0 6px}
+    .pdf-tbl{width:100%;border-collapse:collapse;font-size:9pt;margin-top:6px;word-wrap:break-word}
+    .pdf-tbl th{background:#8B1A1A;color:white;padding:5px 4px;text-align:center;border:1px solid #a83226;font-size:8.5pt;font-weight:700}
     .pdf-tbl th.thl{text-align:left}
-    .pdf-tbl td{padding:5px 4px;border:1px solid #999;text-align:center;vertical-align:middle;font-size:8.5pt}
+    .pdf-tbl td{padding:5px 4px;border:1px solid #999;text-align:center;vertical-align:middle;font-size:9.5pt}
     .pdf-tbl td.tdl{text-align:left}
     .pdf-tbl tfoot td{font-weight:bold;background:#f0f0f0;border-top:2px solid #8B1A1A}
-    .pdf-tvrow td{background:#fffbf5!important;font-size:7.5pt;color:#888;padding:3px 5px!important;border-color:#ddd!important}
-    .pdf-wp{border:1px solid #ccc;padding:12px 14px;font-size:9pt;white-space:pre-wrap;min-height:80px;line-height:1.5;border-radius:8px}
+    .pdf-tvrow td{background:#fffbf5!important;font-size:8.5pt;color:#888;padding:3px 5px!important;border-color:#ddd!important}
+    .pdf-wp{border:1px solid #ccc;padding:12px 14px;font-size:10pt;white-space:pre-wrap;min-height:80px;line-height:1.5;border-radius:8px}
     .pdf-sigs{display:flex;justify-content:space-between;margin-top:40px;page-break-inside:avoid}
     .pdf-sig{width:40%;text-align:center}
-    .pdf-sig-line{border-top:1px solid #000;padding-top:4px;font-size:9pt;color:#333;margin-top:2px}
+    .pdf-sig-line{border-top:1px solid #000;padding-top:4px;font-size:10pt;color:#333;margin-top:2px}
     .pdf-sig img{max-width:180px;height:auto;display:block;margin:0 auto 4px}
     .pdf-sig-empty{height:55px}
     .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
@@ -2070,6 +2072,11 @@ async function salva(invia){
   cRT.fotoCount=fotos.length;
   cRT.firmaTec=getFT();
   cRT.firmaCli=getFC();
+  // Debug: se firmaTec è vuoto ma c'è firma salvata, forza
+  if(!cRT.firmaTec&&db.config.firmaSalvata){
+    cRT.firmaTec=db.config.firmaSalvata;
+    console.warn('firmaTec: usato fallback firma salvata');
+  }
   cRT.stato=invia?'Inviato':(isPr?'Aperto':'Completato');
   cRT.lang=lang;
   cRT.isPrelim=isPr;
