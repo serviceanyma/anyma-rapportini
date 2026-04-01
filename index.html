@@ -881,7 +881,7 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v83';
+const APP_VERSION='v84';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -2166,11 +2166,27 @@ async function inviaEmailViaPA(rt, toList){
     const fC=rt.firmaCli||'';
     // Genera HTML per PA - usa font di sistema, rimuove ogni traccia di Google Fonts
     let htmlContent=getPDFStyles(true)+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
-    // Sanitizza: elimina qualsiasi riferimento residuo a Barlow o Google Fonts
+    // Sanitizza per Word Online renderer (ignora CSS, usa solo stili inline)
     htmlContent=htmlContent.replace(/@import[^;]+googleapis[^;]+;/g,'');
-    // Sostituisce font-family con Barlow → Calibri (sia CSS che inline style)
-    htmlContent=htmlContent.replace(/font-family\s*:\s*['"]?Barlow[^;}"']*['"]?/gi,"font-family:'Calibri','Segoe UI',Arial,sans-serif");
-    htmlContent=htmlContent.replace(/font-family\s*:\s*(['"]?Calibri[^;}"']*['"]?)\s*!important/gi,"font-family:$1!important");
+    htmlContent=htmlContent.replace(/font-family\s*:\s*['"]?Barlow[^;}"']*['"]?/gi,"font-family:Calibri,'Segoe UI',Arial,sans-serif");
+    // Word Online ignora <style> - inietta font-family inline su tutti gli elementi
+    const WFONT="font-family:Calibri,'Segoe UI',Arial,sans-serif;";
+    // Aggiungi style inline su <body>
+    htmlContent=htmlContent.replace(/<body([^>]*)>/i,(m,attrs)=>{
+      if(attrs.includes('font-family')) return m;
+      return `<body${attrs} style="${WFONT}">`;
+    });
+    // Aggiungi/integra font su <td>, <th>, <p>, <div>, <span>, <strong>
+    htmlContent=htmlContent.replace(/<(td|th|p|div|span|strong|b)(\s[^>]*)?>/gi,(m,tag,attrs='')=>{
+      attrs=attrs||'';
+      const styleM=attrs.match(/style=["']([^"']*)["']/i);
+      if(styleM){
+        if(styleM[1].includes('font-family')) return m;
+        const newStyle=styleM[1]+';'+WFONT;
+        return m.replace(/style=["'][^"']*["']/i,`style="${newStyle}"`);
+      }
+      return `<${tag}${attrs} style="${WFONT}">`;
+    });
     const dataRT=rt.giornate?.[0]?.data||rt.dataCreazione?.split('T')[0]||new Date().toISOString().split('T')[0];
 
     // 3. Costruisce il payload JSON per PA
