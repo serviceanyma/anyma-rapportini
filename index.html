@@ -902,7 +902,7 @@ const m2t=m=>m<0?'':String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).pa
 function tSel(val,onch,style=''){
   // Genera lista da 05:00 a 23:30 a step 30min
   const slots=[];
-  for(let hh=0;hh<24;hh++) if hh<24(for(let mm=0;mm<60;mm+=30)){
+  for(let hh=0;hh<24;hh++) for(let mm=0;mm<60;mm+=30){
     slots.push(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));
   }
   // Trova l'indice dell'orario suggerito (o 0 se vuoto/"—")
