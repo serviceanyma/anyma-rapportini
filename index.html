@@ -226,7 +226,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   position:fixed;left:-9999px;top:0;
   width:750px;
   background:white;
-  font-family:'Barlow',Helvetica,sans-serif;
+  font-family:'Barlow',Arial,Helvetica,sans-serif;
   font-size:9pt;
   color:#222;
   line-height:1.4;
@@ -881,7 +881,7 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v81';
+const APP_VERSION='v81a';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -2014,10 +2014,10 @@ async function generatePDF(rt,gd,fT,fC){
   try{
     const blob=await generatePDFBlob(rt,gd,fT,fC);
     if(!blob){toast('Errore generazione PDF','err');return;}
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${rt.numRT}.pdf`;a.click();
+    const pdfName=(rt.isPrelim?rt.numRT+'_Pre':rt.numRT)+'.pdf';const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=pdfName;a.click();
     toast('✓ PDF scaricato','suc');
     // Also upload to OneDrive if connected
-    if(m365Token) uploadPDFToOneDrive(rt.numRT+'.pdf',blob);
+    if(m365Token) uploadPDFToOneDrive((rt.isPrelim?rt.numRT+'_Pre':rt.numRT)+'.pdf',blob);
   }catch(err){console.error(err);toast('Errore generazione PDF','err');}
 }
 
@@ -2122,7 +2122,7 @@ async function salva(invia){
     try{
       const pdfBlob=await generatePDFBlob(cRT,cRT.giornate,cRT.firmaTec||'',cRT.firmaCli||'');
       if(pdfBlob){
-        const url=await uploadPDFToOneDrive(cRT.numRT+'.pdf',pdfBlob);
+        const url=await uploadPDFToOneDrive((cRT.isPrelim?cRT.numRT+'_Pre':cRT.numRT)+'.pdf',pdfBlob);
         if(url&&cRT){
           cRT.odPdfUrl=url;
           // Aggiorna PDFUrl su SP
@@ -2166,7 +2166,7 @@ async function inviaEmailViaPA(rt, toList){
     // 3. Costruisce il payload JSON per PA
     const queuePayload=JSON.stringify({
       htmlInput:     htmlContent,
-      IDRapportino:  rt.numRT||'',
+      IDRapportino:  (rt.isPrelim?rt.numRT+'_Pre':rt.numRT)||'',
       RagioneSociale:rt.cliente||'',
       DataRT:        dataRT,
       EmailCliente:  toList.join(';')
@@ -2177,7 +2177,8 @@ async function inviaEmailViaPA(rt, toList){
     const siteUrl=db.config.spSite||'https://anymapack.sharepoint.com/sites/SERVICE';
     const siteHost=new URL(siteUrl).hostname;   // anymapack.sharepoint.com
     const sitePath=new URL(siteUrl).pathname;    // /sites/SERVICE
-    const fileName=`${rt.numRT||('RT_'+Date.now())}.json`;
+    const rtNomeFile=(rt.isPrelim?rt.numRT+'_Pre':rt.numRT)||('RT_'+Date.now());
+    const fileName=`${rtNomeFile}.json`;
 
     const tok=await m365GetToken();
     if(!tok) throw new Error('Token M365 non disponibile');
@@ -3516,11 +3517,13 @@ function renderDash(){
 
   // ── KPI ──
   const totRt=list.length;
-  const totOre=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
+  const isTeleassRT=r=>r.tipo==='Teleassistenza';
+  const totOreTeleass=list.filter(isTeleassRT).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
+  const totOreInLoco=list.filter(r=>!isTeleassRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
+  const totOre=totOreInLoco+totOreTeleass; // totale ancora usato altrove
   const totViag=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreViag||0),s),0);
   const totKm=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseInt(g.km||0),s),0);
   const inviati=list.filter(r=>r.stato==='Inviato'||r.stato==='Firmato').length;
-  const bozze=list.filter(r=>r.stato==='Bozza').length;
   const clientiUnici=[...new Set(list.map(r=>r.cliente))].length;
   const totPranzi=list.reduce((s,r)=>(r.giornate||[]).filter(g=>g.pranzo).length+s,0);
 
@@ -3530,8 +3533,8 @@ function renderDash(){
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Rapportini</div>
     </div>
     <div class="card" style="border-left:3px solid var(--ok);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${totOre.toFixed(1)}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore lavoro</div>
+      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${totOreInLoco.toFixed(1)}</div>
+      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore in loco</div>
     </div>
     <div class="card" style="border-left:3px solid var(--warn);padding:12px">
       <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--warn)">${totKm}</div>
@@ -3545,9 +3548,9 @@ function renderDash(){
       <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${inviati}</div>
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Inviati</div>
     </div>
-    <div class="card" style="border-left:3px solid var(--tx3);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--tx2)">${bozze}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Bozze</div>
+    <div class="card" style="border-left:3px solid #06b6d4;padding:12px">
+      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totOreTeleass.toFixed(1)}</div>
+      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore teleass.</div>
     </div>
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
       <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${clientiUnici}</div>
@@ -3879,13 +3882,11 @@ async function autoSyncOnLogin(){
 
     // 5. Done
     setBar(`SharePoint — ${nRT} rapportini · ${db.clienti.length} clienti`,'var(--ok)');
-
   }catch(e){
     console.warn('AutoSync error:',e);
     setBar('Errore sincronizzazione — dati offline','var(--cr2)');
   }
 }
-
 </script>
 </body>
 </html>
