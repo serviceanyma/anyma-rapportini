@@ -881,7 +881,7 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v81a';
+const APP_VERSION='v81';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -2023,11 +2023,15 @@ async function generatePDF(rt,gd,fT,fC){
 
 
 
-function getPDFStyles(){
+function getPDFStyles(forExport=false){
+  // forExport=true → usa font di sistema (OneDrive Convert non carica Google Fonts)
+  // forExport=false → usa Barlow già caricato nella PWA
+  const fontImport=forExport?'':"@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@700&display=swap');";
+  const fontMain=forExport?"'Calibri','Segoe UI',Arial,sans-serif":"'Barlow',Arial,Helvetica,sans-serif";
   return `<style>
-    @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@700&display=swap');
+    ${fontImport}
     @page{size:A4 portrait;margin:20px}
-    #pdfTemplate,#pdfTemplate *{font-family:'Barlow',Arial,Helvetica,sans-serif!important}
+    #pdfTemplate,#pdfTemplate *{font-family:${fontMain}!important}
     .pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:9pt;color:#222;box-sizing:border-box}
     .pdf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #8B1A1A;padding-bottom:8px;margin-bottom:10px}
     .pdf-logo-img{max-width:220px;height:auto;flex-shrink:0}
@@ -2160,7 +2164,7 @@ async function inviaEmailViaPA(rt, toList){
     // 2. Genera HTML del rapportino
     const fT=rt.firmaTec||'';
     const fC=rt.firmaCli||'';
-    const htmlContent=getPDFStyles()+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
+    const htmlContent=getPDFStyles(true)+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
     const dataRT=rt.giornate?.[0]?.data||rt.dataCreazione?.split('T')[0]||new Date().toISOString().split('T')[0];
 
     // 3. Costruisce il payload JSON per PA
