@@ -486,6 +486,52 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
       </div>
     </div>
   </div>
+
+  <!-- SEZIONE TELEASSISTENZA -->
+  <div id="gioTA" style="display:none">
+    <!-- Info pacchetto -->
+    <div class="card" id="taPacchettoInfo" style="margin-bottom:10px;border-left:3px solid #06b6d4">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Pacchetto Teleassistenza</div>
+          <div id="taPacchetto" style="font-size:16px;font-weight:700;color:#22d3ee">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Saldo disponibile</div>
+          <div id="taSaldo" style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">—</div>
+        </div>
+      </div>
+    </div>
+    <!-- Data sessione -->
+    <div class="fg" style="margin-bottom:10px">
+      <label class="fl">Data sessione</label>
+      <input type="date" class="fc" id="taData" onchange="cRT.ta_data=this.value">
+    </div>
+    <!-- Lista sessioni -->
+    <div id="taSessioniList"></div>
+    <button class="btn bgh bfl bsm" onclick="addSessioneTA()" style="margin-bottom:10px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Aggiungi sessione
+    </button>
+    <!-- Totali -->
+    <div class="card" style="margin-bottom:10px;background:var(--s2)">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)" id="taTotMin">0</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. effettivi</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee" id="taTotArr">0</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. fatturati (arr. 30')</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--ok)" id="taSaldoDopo">—</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Saldo dopo (ore)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ATTIVITÀ SVOLTE — sotto le giornate -->
   <div class="stl">Attività svolte</div>
   <div class="card">
@@ -946,7 +992,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v100';
+const APP_VERSION='v101';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1274,7 +1320,7 @@ function nuovoRT(){
   // Preselect only the logged-in user
   selTec=m365User?.displayName?[m365User.displayName]:[];
   gio=[makeG()];fotos=[];fSt={tec:false,cli:false};usaSalvata=false;
-  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:''};
+  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:'',sessioni:[],ta_data:'',ta_minutiUsati:0,ta_oreUsate:0,ta_saldoDopo:null};
   populateDDs();
   document.getElementById('inRT').value=cRT.numRT;
   document.getElementById('inAtt').value='';
@@ -1309,6 +1355,7 @@ function goStep(s){
   }else if(s===1){
     // Back to Dati — salva chiamate prima di uscire
     if(isTelefonica()) cRT.chiamate=telChiamate.map(c=>({...c}));
+    if(isTeleassistenza()) cRT.sessioni=taSessioni.map(s=>({...s}));
     populateDDs();document.getElementById('inRT').value=cRT.numRT;
     const c=db.clienti.find(x=>x.nome===cRT.cliente);if(c)document.getElementById('inCli').value=c.id;
     document.getElementById('inEmail').value=cRT.clienteEmail||'';
@@ -1322,14 +1369,20 @@ function goStep(s){
     // Giornate/Sessione → Anteprima
     cRT.attivita=document.getElementById('inAtt').value;
     if(isTelefonica()){
-      // Salva chiamate e data sessione
       if(!telChiamate.length){toast('⚠️ Aggiungi almeno una chiamata','err');return;}
       const dataTel=document.getElementById('telData')?.value||today();
       cRT.chiamate_data=dataTel;
       cRT.chiamate=telChiamate.map(c=>({...c}));
-      // Simula giornata per compatibilità SP (1 giornata con ore lavoro = minuti/60)
       const totArr=cRT.minutiUsati||0;
       cRT.giornate=[{data:dataTel,lavDa:'',lavA:'',oreLav:parseFloat((totArr/60).toFixed(2)),oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}];
+      cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
+    } else if(isTeleassistenza()){
+      if(!taSessioni.length){toast('⚠️ Aggiungi almeno una sessione','err');return;}
+      const dataTA=document.getElementById('taData')?.value||today();
+      cRT.ta_data=dataTA;
+      cRT.sessioni=taSessioni.map(s=>({...s}));
+      const totOre=cRT.ta_oreUsate||0;
+      cRT.giornate=[{data:dataTA,lavDa:'',lavA:'',oreLav:totOre,oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}];
       cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
     } else {
       const errs=valAll();
@@ -1549,23 +1602,169 @@ function renderChiamate(){
   aggiornaTotaliTel();
 }
 
+// ══════════════════════════════════════
+// TELEASSISTENZA — UI e logica sessioni
+// ══════════════════════════════════════
+
+const isTeleassistenza=()=>cRT&&cRT.tipo==='Teleassistenza';
+
+let taSessioni=[]; // sessioni correnti durante editing
+
+function initTeleassistenza(){
+  const contr=getContratto(cRT.cliente,'Teleassistenza');
+  cRT.pacchetto=contr.pacchetto;
+  cRT.saldoPrima=contr.saldoOre||0;
+  cRT.tipoServizio='Teleassistenza';
+  taSessioni=(cRT.sessioni||[]).slice();
+  const dataEl=document.getElementById('taData');
+  if(dataEl) dataEl.value=cRT.ta_data||today();
+  cRT.ta_data=cRT.ta_data||today();
+  aggiornaTAInfo();
+  renderSessioniTA();
+}
+
+function aggiornaTAInfo(){
+  const contr=getContratto(cRT.cliente,'Teleassistenza');
+  const pacEl=document.getElementById('taPacchetto');
+  const saldoEl=document.getElementById('taSaldo');
+  if(pacEl) pacEl.textContent=contr.pacchetto||'Spot';
+  if(saldoEl){
+    if(contr.pacchetto==='Spot'||contr.pacchetto==='Premium') saldoEl.textContent='N/A';
+    else saldoEl.textContent=(contr.saldoOre||0)+' h';
+  }
+  aggiornaTotaliTA();
+}
+
+function aggiornaTotaliTA(){
+  const contr=getContratto(cRT.cliente,'Teleassistenza');
+  const pac=contr.pacchetto||'Spot';
+  let totMin=0;
+  taSessioni.forEach(s=>{
+    const dur=calcDurataMin(s.inizio,s.fine);
+    s.durata=dur;
+    totMin+=dur;
+  });
+  // Arrotondamento 30min sul totale (Base e Standard)
+  const totArr=(pac==='Spot'||pac==='Premium')?totMin:Math.ceil(totMin/30)*30;
+  const totOre=parseFloat((totArr/60).toFixed(2));
+  cRT.ta_minutiUsati=totArr;
+  cRT.ta_oreUsate=totOre;
+  // Saldo in ore
+  let saldoDopo=null;
+  if(pac!=='Spot'&&pac!=='Premium'){
+    saldoDopo=Math.max(0,(contr.saldoOre||0)-totOre);
+    cRT.ta_saldoDopo=saldoDopo;
+  }
+  const elMin=document.getElementById('taTotMin');
+  const elArr=document.getElementById('taTotArr');
+  const elDopo=document.getElementById('taSaldoDopo');
+  if(elMin) elMin.textContent=totMin;
+  if(elArr) elArr.textContent=totArr;
+  if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo.toFixed(2)+' h':'N/A';
+}
+
+function makeSessioneTA(){
+  return {inizio:'',fine:'',referente:'',durata:0};
+}
+
+function addSessioneTA(){
+  taSessioni.push(makeSessioneTA());
+  renderSessioniTA();
+}
+
+function delSessioneTA(i){
+  taSessioni.splice(i,1);
+  renderSessioniTA();
+}
+
+function updSessioneTA(i,f,v){
+  taSessioni[i][f]=v;
+  const dur=calcDurataMin(taSessioni[i].inizio,taSessioni[i].fine);
+  taSessioni[i].durata=dur;
+  aggiornaTotaliTA();
+  const durEl=document.getElementById(`taDur_${i}`);
+  if(durEl) durEl.textContent=dur+' min';
+}
+
+function updOreMinTA(i,campo,tipo,val){
+  const cur=taSessioni[i][campo]||'';
+  const parts=cur.split(':');
+  let hh=parts[0]||'';
+  let mm=parts[1]||'00';
+  if(tipo==='h') hh=val;
+  else mm=val;
+  const nuovo=hh?(hh+':'+mm):'';
+  updSessioneTA(i,campo,nuovo);
+}
+
+function renderSessioniTA(){
+  const el=document.getElementById('taSessioniList');
+  if(!el) return;
+  if(!taSessioni.length){
+    el.innerHTML=`<div style="color:var(--tx3);font-size:13px;text-align:center;padding:16px">Nessuna sessione — premi Aggiungi</div>`;
+    aggiornaTotaliTA();
+    return;
+  }
+  el.innerHTML=taSessioni.map((s,i)=>{
+    const dur=calcDurataMin(s.inizio,s.fine);
+    s.durata=dur;
+    return `<div class="gc" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">🖥 Sessione ${i+1}</span>
+        <button class="delbtn" onclick="delSessioneTA(${i})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="margin-bottom:6px">
+        <div class="fr c2" style="margin-bottom:6px">
+          <div class="fg" style="margin:0"><label class="fl">Inizio — Ora</label>${selOre(s.inizio,`updOreMinTA(${i},'inizio','h',this.value)`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Inizio — Min</label>${selMin(s.inizio,`updOreMinTA(${i},'inizio','m',this.value)`)}</div>
+        </div>
+        <div class="fr c2">
+          <div class="fg" style="margin:0"><label class="fl">Fine — Ora</label>${selOre(s.fine,`updOreMinTA(${i},'fine','h',this.value)`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Fine — Min</label>${selMin(s.fine,`updOreMinTA(${i},'fine','m',this.value)`)}</div>
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label class="fl">Referente cliente</label>
+        <input type="text" class="fc" value="${s.referente||''}" placeholder="Nome cognome" onchange="updSessioneTA(${i},'referente',this.value)">
+      </div>
+      <div style="font-size:12px;color:var(--tx3)">
+        ⏱ Durata: <b id="taDur_${i}" style="color:var(--tx)">${dur} min</b>
+      </div>
+    </div>`;
+  }).join('');
+  aggiornaTotaliTA();
+}
+
 // Toggle UI standard ↔ telefonica nello step giornate
 function switchGioMode(){
   const isTel=isTelefonica();
+  const isTA=isTeleassistenza();
   const stdEl=document.getElementById('gioStd');
   const telEl=document.getElementById('gioTel');
+  const taEl=document.getElementById('gioTA');
   const titleEl=document.getElementById('gioTitle');
-  if(stdEl) stdEl.style.display=isTel?'none':'block';
+  if(stdEl) stdEl.style.display=(!isTel&&!isTA)?'block':'none';
   if(telEl) telEl.style.display=isTel?'block':'none';
-  if(titleEl) titleEl.textContent=isTel?'2 — Sessione Telefonica':'2 — Giornate intervento';
+  if(taEl)  taEl.style.display=isTA?'block':'none';
+  if(titleEl){
+    if(isTel) titleEl.textContent='2 — Sessione Telefonica';
+    else if(isTA) titleEl.textContent='2 — Sessione Teleassistenza';
+    else titleEl.textContent='2 — Giornate intervento';
+  }
   if(isTel) initTelefonica();
+  if(isTA)  initTeleassistenza();
 }
 
 // Quando si cambia il tipo intervento in scrDati, aggiorna la label del bottone avanti
 function onTipoChange(val){
   cRT.tipo=val;
   const btnAvanti=document.querySelector('#scrDati .btn.bp');
-  if(btnAvanti) btnAvanti.textContent=val==='Assistenza Telefonica'?'Avanti — Sessione ›':'Avanti — Giornate ›';
+  if(!btnAvanti) return;
+  if(val==='Assistenza Telefonica') btnAvanti.textContent='Avanti — Sessione ›';
+  else if(val==='Teleassistenza')   btnAvanti.textContent='Avanti — Sessione ›';
+  else                              btnAvanti.textContent='Avanti — Giornate ›';
 }
 
 function renderGio(){
@@ -2058,10 +2257,96 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
   </div>`;
 }
 
+function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
+  const L=T[l]||T.EN;
+  const sessioni=rt.sessioni||[];
+  const pac=rt.pacchetto||'Spot';
+  const dataTA=rt.ta_data||'';
+  const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
+  const saldoPrima=(pac==='Spot'||pac==='Premium')?null:(rt.saldoPrima||0);
+  const saldoDopo=(pac==='Spot'||pac==='Premium')?null:(rt.ta_saldoDopo!==null&&rt.ta_saldoDopo!==undefined?rt.ta_saldoDopo:null);
+  const totMin=sessioni.reduce((s,x)=>s+(x.durata||calcDurataMin(x.inizio,x.fine)),0);
+  const totArr=(pac==='Spot'||pac==='Premium')?totMin:Math.ceil(totMin/30)*30;
+  const totOre=parseFloat((totArr/60).toFixed(2));
+  const logoB64=LOGO_PDF;
+  const rows=sessioni.map(s=>{
+    const dur=s.durata||calcDurataMin(s.inizio,s.fine);
+    return `<tr>
+      <td class="tdl">${dataTA}</td>
+      <td>${s.inizio||'—'}</td>
+      <td>${s.fine||'—'}</td>
+      <td><b>${dur} min</b></td>
+      <td class="tdl">${s.referente||'—'}</td>
+    </tr>`;
+  }).join('');
+  const cliObj=db.clienti.find(c=>c.nome===rt.cliente)||{};
+  const rawAddr=cliObj.indirizzo||rt.clienteAddr||'';
+  const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA ${cliObj.piva}`:'')).trim();
+  const sigTec=fT?`<img src="${fT}" style="max-width:180px;height:auto;display:block;margin:0 auto 4px">`:'<div class="pdf-sig-empty"></div>';
+  const sigCli=fC?`<img src="${fC}" style="max-width:180px;height:auto;display:block;margin:0 auto 4px">`:'<div class="pdf-sig-empty"></div>';
+  return `<div class="pdf-page">
+    ${wm}
+    <div class="pdf-hdr">
+      <img class="pdf-logo-img" src="${logoB64}">
+      <div class="pdf-company">
+        <strong>ANYMA SRL</strong>
+        Via Val di Sole 31 - 36010 - Zanè (VI) - Italy<br>
+        Tel. +39 0445 223889 - info@anymapack.it<br>
+        P.IVA IT04494860242 - C.F. &amp; R.I. Vicenza 04494860242<br>
+        REA: VI - 408350 - Cap. Soc. Euro 10.000<br>
+        SDI: 5RUO82D - anyma.srl@legalmail.it
+      </div>
+    </div>
+    <div class="pdf-boxes">
+      <div class="pdf-box">
+        <strong>${L.ri}:</strong> ${rt.numRT}<br>
+        <strong>${L.dt}:</strong> ${new Date(rt.dataCreazione).toLocaleDateString('it-IT')}<br>
+        <strong>${l==='IT'?'Tipo':'Type'}:</strong> ${rt.tipo}<br>
+        <strong>${L.tc}:</strong> ${rt.tecnici||''}
+      </div>
+      <div class="pdf-box">
+        <strong>${rt.cliente}</strong><br>${addrLines}
+      </div>
+    </div>
+    <div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
+      <span><b>${l==='IT'?'Pacchetto':'Package'}:</b> ${pac}</span>
+      <span><b>${l==='IT'?'Saldo prima':'Balance before'}:</b> ${saldoPrima!==null?saldoPrima+' h':'N/A'}</span>
+      <span><b>${l==='IT'?'Ore usate':'Hours used'}:</b> ${totOre} h</span>
+      <span><b>${l==='IT'?'Saldo dopo':'Balance after'}:</b> ${saldoDopo!==null?saldoDopo+' h':'N/A'}</span>
+    </div>
+    <div class="pdf-sec">${l==='IT'?'SESSIONE TELEASSISTENZA:':'REMOTE ASSISTANCE SESSION:'}</div>
+    <table class="pdf-tbl">
+      <thead><tr>
+        <th class="thl">${l==='IT'?'Data':'Date'}</th>
+        <th>${l==='IT'?'Inizio':'Start'}</th>
+        <th>${l==='IT'?'Fine':'End'}</th>
+        <th>${l==='IT'?'Durata':'Duration'}</th>
+        <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td class="tdl" colspan="3"><b>TOTALI</b></td>
+        <td><b>${totMin} min effettivi → ${totArr} min (${totOre} h) fatturati</b></td>
+        <td></td>
+      </tr></tfoot>
+    </table>
+    <div class="pdf-sec">${l==='IT'?'ATTIVITÀ SVOLTE:':'WORK PERFORMED:'}</div>
+    <div class="pdf-wp">${(rt.attivita||'').replace(/\n/g,'<br>')}</div>
+    <div class="pdf-sigs">
+      <div class="pdf-sig">${sigTec}<div class="pdf-sig-line">${l==='IT'?'Firma Tecnico':'Technician Signature'}</div></div>
+      <div class="pdf-sig">${sigCli}<div class="pdf-sig-line">${l==='IT'?'Firma Cliente':'Client Signature'}</div></div>
+    </div>
+  </div>`;
+}
+
 function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   // Branch Telefonica
   if(rt.tipoServizio==='Telefonica'||(rt.tipo==='Assistenza Telefonica'&&rt.chiamate?.length)){
     return buildPDFTelefonica(rt,fT,fC,prelim,l);
+  }
+  // Branch Teleassistenza
+  if(rt.tipo==='Teleassistenza'&&rt.sessioni?.length){
+    return buildPDFTeleassistenza(rt,fT,fC,prelim,l);
   }
   const L=T[l]||T.EN;
   const totO=gd.reduce((s,g)=>s+(parseFloat(g.oreLav)||0),0);
@@ -2513,9 +2798,8 @@ async function salva(invia){
     spAggiornaSaldo(cRT.cliente,'Telefonica',cRT.minutiUsati).catch(e=>console.warn('saldo update:',e));
   }
   // Teleassistenza: scala ore da contratto
-  if(cRT.tipo==='Teleassistenza'){
-    const totOreTA=(cRT.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
-    if(totOreTA>0) spAggiornaSaldo(cRT.cliente,'Teleassistenza',totOreTA).catch(e=>console.warn('saldo TA:',e));
+  if(cRT.tipo==='Teleassistenza'&&cRT.ta_oreUsate>0){
+    spAggiornaSaldo(cRT.cliente,'Teleassistenza',cRT.ta_oreUsate).catch(e=>console.warn('saldo TA:',e));
   }
   // Manutenzione: scala ore da contratto
   if(cRT.tipo==='Manutenzione Ordinaria'||cRT.tipo==='Manutenzione Straordinaria'){
@@ -2735,6 +3019,7 @@ function modRT(){
   gio=cRT.giornate?cRT.giornate.map(g=>({...g})):[makeG()];
   // Ripristina chiamate telefonica
   telChiamate=(cRT.chiamate||[]).map(c=>({...c}));
+  taSessioni=(cRT.sessioni||[]).map(s=>({...s}));
   fotos=[];fSt={tec:!!cRT.firmaTec,cli:!!cRT.firmaCli};
   lang=cRT.lang||'EN';isPr=cRT.isPrelim||false;
   selTec=cRT.tecnici?cRT.tecnici.split(', ').filter(Boolean):[];
@@ -3363,6 +3648,7 @@ const SP_SCHEMA = [
   {n:'SaldoPrima',    t:'number',  d:'Saldo Prima'},
   {n:'SaldoDopo',     t:'number',  d:'Saldo Dopo'},
   {n:'ChiamateJSON',  t:'note',    d:'Chiamate JSON'},
+  {n:'SessioniJSON',  t:'note',    d:'Sessioni JSON'},
 ];
 
 let spSiteId = null;
@@ -3477,6 +3763,8 @@ function spItemToRT(item){
   // Chiamate telefonica
   let chiamate=[];
   try{ if(f.ChiamateJSON) chiamate=JSON.parse(f.ChiamateJSON); }catch(e){}
+  let sessioni=[];
+  try{ if(f.SessioniJSON) sessioni=JSON.parse(f.SessioniJSON); }catch(e){}
   return {
     id:           'sp_'+item.id,
     _spId:        item.id,
@@ -3506,6 +3794,11 @@ function spItemToRT(item){
     saldoPrima:   parseInt(f.SaldoPrima||0),
     saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
+    sessioni,
+    ta_data:      f.DataIntervento?.split('T')[0]||'',
+    ta_minutiUsati:parseInt(f.MinutiUsati||0),
+    ta_oreUsate:  parseFloat(f.SaldoPrima||0)-parseFloat(f.SaldoDopo||0)||0,
+    ta_saldoDopo: f.SaldoDopo!=null?parseFloat(f.SaldoDopo):null,
   };
 }
 
@@ -3544,6 +3837,7 @@ function rtToSPFields(rt){
     SaldoPrima:     rt.saldoPrima||0,
     SaldoDopo:      rt.saldoDopo||0,
     ChiamateJSON:   JSON.stringify(rt.chiamate||[]),
+    SessioniJSON:   JSON.stringify(rt.sessioni||[]),
   };
 }
 
