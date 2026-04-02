@@ -858,11 +858,11 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">RT per tipo intervento</div>
-    <canvas id="chartTipo" height="120"></canvas>
+    <canvas id="chartTipo" height="80"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Ore per cliente (in loco)</div>
-    <canvas id="chartCliOre" height="120"></canvas>
+    <canvas id="chartCliOre" height="160"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Andamento mensile RT</div>
@@ -997,7 +997,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v126';
+const APP_VERSION='v127';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -4932,22 +4932,58 @@ function renderDashCharts(list){
     });
   }else if(ctxT){ctxT.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
 
-  // ── 2. Ore per cliente in loco (bar orizzontale) ──
+  // ── 2. Ore per cliente: 3 barre (Telefonica/Teleassistenza/Manutenzione) ──
   destroyChart('cliore');
-  const byCliOre={};
-  list.filter(r=>r.tipo!=='Assistenza Telefonica'&&r.tipoServizio!=='Telefonica')
-    .forEach(r=>{const c=r.cliente||'—';(r.giornate||[]).forEach(g=>{byCliOre[c]=(byCliOre[c]||0)+parseFloat(g.oreLav||0);});});
-  const cliLabels=Object.keys(byCliOre).sort((a,b)=>byCliOre[b]-byCliOre[a]).slice(0,8);
-  const cliData=cliLabels.map(c=>+byCliOre[c].toFixed(1));
+  // Colori categoria: arancione=Tel, ciano=TA, verde=Manutenzione
+  const C_TEL='#f59e0b'; const C_TA='#06b6d4'; const C_MAN='#2ecc71';
+  const isTF=r=>r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+  const isTA=r=>r.tipo==='Teleassistenza';
+  const isMAN=r=>r.tipo==='Manutenzione Ordinaria'||r.tipo==='Manutenzione Straordinaria';
+  // Raccolta per cliente
+  const byCliTel={},byCliTA={},byCliMan={},byCliSet=new Set();
+  list.forEach(r=>{
+    const c=r.cliente||'—';
+    byCliSet.add(c);
+    if(isTF(r)){
+      // Telefonica: converti minuti in ore
+      byCliTel[c]=(byCliTel[c]||0)+parseFloat(((r.minutiUsati||r._minTel||0)/60).toFixed(2));
+    } else if(isTA(r)){
+      byCliTA[c]=(byCliTA[c]||0)+parseFloat((r._oreTA||r.ta_oreUsate||(r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0)));
+    } else if(isMAN(r)){
+      byCliMan[c]=(byCliMan[c]||0)+(r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
+    } else {
+      // Standard/loco → manutenzione
+      byCliMan[c]=(byCliMan[c]||0)+(r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
+    }
+  });
+  // Ordina clienti per ore totali desc, max 8
+  const cliLabels=[...byCliSet].sort((a,b)=>{
+    const totA=(byCliTel[a]||0)+(byCliTA[a]||0)+(byCliMan[a]||0);
+    const totB=(byCliTel[b]||0)+(byCliTA[b]||0)+(byCliMan[b]||0);
+    return totB-totA;
+  }).slice(0,8);
   const ctxC=document.getElementById('chartCliOre');
   if(ctxC&&cliLabels.length){
     _charts['cliore']=new Chart(ctxC,{
       type:'bar',
-      data:{labels:cliLabels,datasets:[{label:'Ore',data:cliData,backgroundColor:'#2ecc71aa',borderColor:'#2ecc71',borderWidth:1}]},
-      options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{
-        x:{ticks:{color:'#aaa',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},
-        y:{ticks:{color:'#ccc',font:{size:10}},grid:{display:false}}
-      }}
+      data:{
+        labels:cliLabels,
+        datasets:[
+          {label:'Telefonica (h)',data:cliLabels.map(c=>+((byCliTel[c]||0).toFixed(2))),backgroundColor:C_TEL+'aa',borderColor:C_TEL,borderWidth:1},
+          {label:'Teleassistenza (h)',data:cliLabels.map(c=>+((byCliTA[c]||0).toFixed(2))),backgroundColor:C_TA+'aa',borderColor:C_TA,borderWidth:1},
+          {label:'Manutenzione (h)',data:cliLabels.map(c=>+((byCliMan[c]||0).toFixed(2))),backgroundColor:C_MAN+'aa',borderColor:C_MAN,borderWidth:1}
+        ]
+      },
+      options:{
+        indexAxis:'y',responsive:true,
+        plugins:{
+          legend:{display:true,position:'top',labels:{color:'#aaa',font:{size:10},boxWidth:10,padding:8}}
+        },
+        scales:{
+          x:{stacked:false,ticks:{color:'#aaa',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},
+          y:{stacked:false,ticks:{color:'#ccc',font:{size:10}},grid:{display:false}}
+        }
+      }
     });
   }else if(ctxC){ctxC.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
 
