@@ -796,6 +796,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
     <div class="fwrap" id="wCfg"><canvas id="cCfg"></canvas><div class="fph" id="phCfg">✍ Disegna qui la tua firma</div></div>
     <div style="display:flex;gap:7px;margin-top:8px">
       <button class="btn bgh bsm" onclick="clrCfgF()">✕ Cancella</button>
+      <button class="btn bgh bsm" onclick="setupCfgF()" title="Se il canvas non risponde al tocco, premi qui">↺ Attiva</button>
       <button class="btn bp bsm" onclick="salvaCfgF()">💾 Salva firma</button>
     </div>
   </div>
@@ -993,7 +994,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v114';
+const APP_VERSION='v115';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2063,7 +2064,8 @@ function setupCanvas(id, key, onEndExtra){
   if(!cv) return;
   // Usa il wrapper come riferimento dimensioni
   const wrap=cv.parentElement;
-  const w=wrap.offsetWidth||wrap.clientWidth||360;
+  // Forza reflow se il contenitore non ha ancora dimensioni
+  const w=wrap.offsetWidth||wrap.clientWidth||wrap.getBoundingClientRect().width||340;
   cv.width=w;
   cv.height=Math.round(w/3);
   const ctx=cv.getContext('2d');
@@ -2090,9 +2092,31 @@ function setupCanvas(id, key, onEndExtra){
 function setupC(id,k){ setupCanvas(id,k); }
 function setupCfgF(){
   setupCanvas('cCfg','cfg');
-  // Pulsante onmouseup extra per nascondere placeholder cfg
   const cv=document.getElementById('cCfg');
-  if(cv) cv.onmouseup=()=>{
+  if(!cv) return;
+  // Reinizializza se width ancora 0
+  if(cv.width<10){
+    requestAnimationFrame(()=>{
+      const wrap=cv.parentElement;
+      const w=wrap.offsetWidth||wrap.getBoundingClientRect().width||340;
+      cv.width=w; cv.height=Math.round(w/3);
+      const ctx=cv.getContext('2d');
+      FC['cfg']={cv,ctx,d:false};
+      cv.onmousedown=e=>sd('cfg',e);
+      cv.onmousemove=e=>dr('cfg',e);
+      cv.onmouseup=()=>{if(FC['cfg'])FC['cfg'].d=false;const ph=document.getElementById('phCfg');if(ph)ph.style.display='none';};
+      cv.onmouseleave=()=>{if(FC['cfg']?.d)FC['cfg'].d=false;};
+      cv.ontouchstart=e=>{e.preventDefault();sd('cfg',e.touches[0]);};
+      cv.ontouchmove=e=>{e.preventDefault();dr('cfg',e.touches[0]);};
+      cv.ontouchend=()=>{ed('cfg');};
+      if(db.config.firmaSalvata){
+        const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);img.src=db.config.firmaSalvata;
+        const ph=document.getElementById('phCfg');if(ph)ph.style.display='none';
+      }
+    });
+    return;
+  }
+  cv.onmouseup=()=>{
     if(FC['cfg']) FC['cfg'].d=false;
     const ph=document.getElementById('phCfg');
     if(ph) ph.style.display='none';
@@ -3198,7 +3222,12 @@ function renderCfg(){
       <span style="font-size:13px">${t}</span>
       <button class="btn bdng bic bsm" onclick="delTipo(${i})"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>`).join('');
-  setTimeout(()=>setupCfgF(),120);
+  setTimeout(()=>setupCfgF(),200);
+  // Reinizializza se il canvas è a 0 (scroll non ancora avvenuto)
+  setTimeout(()=>{
+    const cv=document.getElementById('cCfg');
+    if(cv&&cv.width<10) setupCfgF();
+  },600);
 }
 function saveCfg(){
   db.config.email=document.getElementById('cfgMail')?.value||db.config.email;
