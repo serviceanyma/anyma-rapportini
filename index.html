@@ -268,6 +268,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 /* Watermark */
 .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -763,16 +764,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         </div>
       </div>
     </div>
-    <div>
-      <div class="stl">🔧 Tipi</div>
-      <div class="card">
-        <div id="listTipi"></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input type="text" class="fc" id="inNTipo" placeholder="Tipo...">
-          <button class="btn bp bsm" onclick="addTipo()">+</button>
-        </div>
-      </div>
-    </div>
+    <!-- Tipi gestiti da SP (colonna Tipo0 come Scelta) -->
   </div>
 
   <!-- ── BACKUP ── -->
@@ -811,10 +803,18 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
     <div id="dashTabCli" style="overflow-x:auto"></div>
   </div>
 
-  <!-- Lista rapportini ultimi 7 giorni -->
-  <div class="stl">Rapportini — ultimi 7 giorni</div>
-  <div id="dashListRT"></div>
-  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--b1);text-align:center">
+  <!-- Grafici -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="stl" style="margin-bottom:10px">RT per tipo intervento</div>
+    <canvas id="chartTipo" height="180"></canvas>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div class="stl" style="margin-bottom:10px">Ore per cliente (in loco)</div>
+    <canvas id="chartCliOre" height="180"></canvas>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div class="stl" style="margin-bottom:10px">Andamento mensile RT</div>
+    <canvas id="chartMensile" height="160"></canvas>
   </div>
   <div style="height:75px"></div>
 </div>
@@ -854,6 +854,15 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
     <div class="fg"><label class="fl">Email *</label><input type="email" class="fc" id="nEmail"></div>
     <div class="fg"><label class="fl">Indirizzo</label><textarea class="fc" id="nAddr" style="min-height:65px" placeholder="Via, numero&#10;CAP Città&#10;Paese"></textarea></div>
     <div class="fg"><label class="fl">Telefono</label><input type="tel" class="fc" id="nTel"></div>
+    <div class="fg"><label class="fl">Pacchetto telefonica</label>
+      <select class="fc" id="nPacchetto">
+        <option value="">— Nessun contratto —</option>
+        <option value="Spot">Spot</option>
+        <option value="Pack4h">Pack 4h</option>
+        <option value="Pack15h">Pack 15h</option>
+        <option value="Unlimited">Unlimited</option>
+      </select>
+    </div>
     <div style="display:flex;gap:9px;margin-top:5px">
       <button class="btn bgh" style="flex:1" onclick="closeOvl()">Annulla</button>
       <button class="btn bp" style="flex:1" onclick="salvaCli()">Salva</button>
@@ -939,7 +948,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v92';
+const APP_VERSION='v94';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1407,15 +1416,15 @@ function aggiornaTelInfo(){
 function aggiornaTotaliTel(){
   const contr=getContratto(cRT.cliente);
   const pac=contr.pacchetto||'Spot';
-  let totMin=0,totArr=0;
+  let totMin=0;
   telChiamate.forEach(c=>{
     const dur=calcDurataMin(c.inizio,c.fine);
-    const arr=arrotondaMinuti(dur,pac);
     c.durata=dur;
-    c.arrotondamento=arr;
+    c.arrotondamento=dur; // durata effettiva per riga
     totMin+=dur;
-    totArr+=arr;
   });
+  // FIX: arrotondamento sul TOTALE, non per singola chiamata
+  const totArr=arrotondaMinuti(totMin,pac);
   cRT.minutiUsati=totArr;
   // Saldo dopo
   let saldoDopo=null;
@@ -1431,6 +1440,30 @@ function aggiornaTotaliTel(){
   if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo+' min':'N/A';
 }
 
+// Helper select ore (0-23) e minuti (0-59)
+function selOre(val,onch){
+  const hh=val?parseInt(val.split(':')[0]):-1;
+  let o='<option value="">—</option>';
+  for(let i=0;i<24;i++) o+=`<option value="${String(i).padStart(2,'0')}"${i===hh?' selected':''}>${String(i).padStart(2,'0')}</option>`;
+  return `<select class="fc" style="width:auto;flex:1" onchange="${onch}">${o}</select>`;
+}
+function selMin(val,onch){
+  const mm=val?parseInt(val.split(':')[1]):-1;
+  let o='<option value="">—</option>';
+  for(let i=0;i<60;i++) o+=`<option value="${String(i).padStart(2,'0')}"${i===mm?' selected':''}>${String(i).padStart(2,'0')}</option>`;
+  return `<select class="fc" style="width:auto;flex:1" onchange="${onch}">${o}</select>`;
+}
+function updOreMin(i,campo,tipo,val){
+  // tipo = 'h' o 'm', campo = 'inizio' o 'fine'
+  const cur=telChiamate[i][campo]||'';
+  const parts=cur.split(':');
+  let hh=parts[0]||'';
+  let mm=parts[1]||'';
+  if(tipo==='h') hh=val;
+  else mm=val;
+  const nuovo=(hh&&mm)?hh+':'+mm:'';
+  updChiamata(i,campo,nuovo);
+}
 function calcDurataMin(inizio,fine){
   if(!inizio||!fine) return 0;
   const [h1,m1]=inizio.split(':').map(Number);
@@ -1475,8 +1508,7 @@ function renderChiamate(){
   const pac=contr.pacchetto||'Spot';
   el.innerHTML=telChiamate.map((c,i)=>{
     const dur=calcDurataMin(c.inizio,c.fine);
-    const arr=arrotondaMinuti(dur,pac);
-    c.durata=dur; c.arrotondamento=arr;
+    c.durata=dur;
     return `<div class="gc" style="margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">📞 Chiamata ${i+1}</span>
@@ -1484,14 +1516,26 @@ function renderChiamate(){
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div class="fr c2" style="margin-bottom:8px">
-        <div class="fg" style="margin:0">
-          <label class="fl">Inizio</label>
-          ${tSel(c.inizio,`updChiamata(${i},'inizio',this.value);updChiamata(${i},'fine',this.value||'')`,'')}
+      <div style="margin-bottom:8px">
+        <div class="fr c2" style="margin-bottom:6px">
+          <div class="fg" style="margin:0">
+            <label class="fl">Inizio — Ora</label>
+            ${selOre(c.inizio,`updOreMin(${i},'inizio','h',this.value)`)}
+          </div>
+          <div class="fg" style="margin:0">
+            <label class="fl">Inizio — Min</label>
+            ${selMin(c.inizio,`updOreMin(${i},'inizio','m',this.value)`)}
+          </div>
         </div>
-        <div class="fg" style="margin:0">
-          <label class="fl">Fine</label>
-          ${tSel(c.fine,`updChiamata(${i},'fine',this.value)`)}
+        <div class="fr c2">
+          <div class="fg" style="margin:0">
+            <label class="fl">Fine — Ora</label>
+            ${selOre(c.fine,`updOreMin(${i},'fine','h',this.value)`)}
+          </div>
+          <div class="fg" style="margin:0">
+            <label class="fl">Fine — Min</label>
+            ${selMin(c.fine,`updOreMin(${i},'fine','m',this.value)`)}
+          </div>
         </div>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -1499,8 +1543,7 @@ function renderChiamate(){
         <input type="text" class="fc" value="${c.referente||''}" placeholder="Nome cognome" onchange="updChiamata(${i},'referente',this.value)">
       </div>
       <div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)">
-        <span>⏱ Effettivi: <b id="telDur_${i}" style="color:var(--tx)">${dur} min</b></span>
-        <span>📋 Fatturati: <b id="telArr_${i}" style="color:#22d3ee">${arr} min</b></span>
+        <span>⏱ Durata: <b id="telDur_${i}" style="color:var(--tx)">${dur} min</b></span>
       </div>
     </div>`;
   }).join('');
@@ -1941,29 +1984,20 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
   const saldoPrima=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoPrima||0);
   const saldoDopo=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoDopo||0);
 
-  // Tabella chiamate
-  let saldoCorrente=saldoPrima;
+  // Tabella chiamate — arrotondamento sul TOTALE
+  const totDur=chiamate.reduce((s,c)=>s+(c.durata||calcDurataMin(c.inizio,c.fine)),0);
+  const totArr=arrotondaMinuti(totDur,pac);
+  const saldoDopoCalc=(saldoPrima!==null)?Math.max(0,saldoPrima-totArr):null;
   const rows=chiamate.map((c,i)=>{
     const dur=c.durata||calcDurataMin(c.inizio,c.fine);
-    const arr=c.arrotondamento||arrotondaMinuti(dur,pac);
-    let saldoCell='N/A';
-    if(saldoCorrente!==null){
-      saldoCorrente=Math.max(0,saldoCorrente-arr);
-      saldoCell=saldoCorrente+' min';
-    }
     return `<tr>
       <td class="tdl">${dataSess}</td>
       <td>${c.inizio||'—'}</td>
       <td>${c.fine||'—'}</td>
-      <td><b>${dur}</b></td>
-      <td style="color:#1e40af">${arr}</td>
+      <td><b>${dur} min</b></td>
       <td class="tdl">${c.referente||'—'}</td>
-      <td style="color:#047857">${saldoCell}</td>
     </tr>`;
   }).join('');
-
-  const totDur=chiamate.reduce((s,c)=>s+(c.durata||0),0);
-  const totArr=chiamate.reduce((s,c)=>s+(c.arrotondamento||0),0);
 
   // Firme
   const sigTec=fT?`<img src="${fT}" style="max-width:180px;height:auto;display:block;margin:0 auto 4px">`:'<div class="pdf-sig-empty"></div>';
@@ -1990,11 +2024,14 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
         <b>${l==='IT'?'Tecnico':'Technician'}:</b> ${rt.tecnici||''}
       </div>
       <div class="pdf-box">
-        <b>${rt.cliente}</b><br>
-        <b>${l==='IT'?'Pacchetto':'Package'}:</b> ${pac}<br>
-        <b>${l==='IT'?'Saldo prima':'Balance before'}:</b> ${saldoPrima!==null?saldoPrima+' min':'N/A'}<br>
-        <b>${l==='IT'?'Saldo dopo':'Balance after'}:</b> ${saldoDopo!==null?saldoDopo+' min':'N/A'}
+        <b>${rt.cliente}</b>
       </div>
+    </div>
+    <div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
+      <span><b>${l==='IT'?'Pacchetto':'Package'}:</b> ${pac}</span>
+      <span><b>${l==='IT'?'Saldo prima':'Balance before'}:</b> ${saldoPrima!==null?saldoPrima+' min':'N/A'}</span>
+      <span><b>${l==='IT'?'Min. usati':'Min. used'}:</b> ${rt.minutiUsati||0} min</span>
+      <span><b>${l==='IT'?'Saldo dopo':'Balance after'}:</b> ${saldoDopo!==null?saldoDopo+' min':'N/A'}</span>
     </div>
     <div class="pdf-sec">${l==='IT'?'SESSIONE TELEFONICA:':'PHONE SESSION:'}</div>
     <table class="pdf-tbl">
@@ -2003,17 +2040,13 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
         <th>${l==='IT'?'Inizio':'Start'}</th>
         <th>${l==='IT'?'Fine':'End'}</th>
         <th>${l==='IT'?'Durata':'Duration'}</th>
-        <th>${l==='IT'?'Fatturati':'Billed'}</th>
         <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
-        <th>${l==='IT'?'Saldo residuo':'Balance'}</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td class="tdl" colspan="3"><b>TOTALI</b></td>
-        <td><b>${totDur} min</b></td>
-        <td><b>${totArr} min</b></td>
+        <td><b>${totDur} min effettivi → ${totArr} min fatturati</b></td>
         <td></td>
-        <td><b>${saldoDopo!==null?saldoDopo+' min':'N/A'}</b></td>
       </tr></tfoot>
     </table>
     <div class="pdf-sec">${l==='IT'?'ATTIVITÀ SVOLTE:':'WORK PERFORMED:'}</div>
@@ -2752,6 +2785,7 @@ function openSkedaCli(id){
         ${c.email?`<div><div class="fl">Email</div><div style="color:var(--tx)">${c.email}</div></div>`:''}
         ${c.tel?`<div><div class="fl">Telefono</div><div style="color:var(--tx)">${c.tel}</div></div>`:''}
         ${c.indirizzo||c.localita||c.comune?`<div><div class="fl">Indirizzo</div><div style="color:var(--tx);white-space:pre-line">${c.indirizzo||[c.comune,c.localita].filter(Boolean).join(', ')}</div></div>`:''}
+        ${c.pacchetto?`<div><div class="fl">Pacchetto telefonica</div><div style="color:#22d3ee;font-weight:700">${c.pacchetto}</div></div>`:''}
         ${c.piva?`<div><div class="fl">P.IVA / C.F.</div><div style="color:var(--tx)">${c.piva}</div></div>`:''}
         ${c.sito?`<div><div class="fl">Sito web</div><a href="${c.sito}" target="_blank" style="color:var(--cr2)">${c.sito}</a></div>`:''}
         ${c.referente?`<div><div class="fl">Referente ANYMA</div><div style="color:var(--tx)">${c.referente}</div></div>`:''}
@@ -2777,6 +2811,7 @@ function editCliOvl(id){
   document.getElementById('nAddr').value=c.indirizzo||'';
   document.getElementById('nLocalita').value=c.localita||'';
   document.getElementById('nTel').value=c.tel||'';
+  const nPac=document.getElementById('nPacchetto');if(nPac)nPac.value=c.pacchetto||'';
   // Cambia il salva per update
   window._editCliId=id;
   document.getElementById('ovlCli').classList.add('on');
@@ -2786,13 +2821,14 @@ function closeOvl(){document.getElementById('ovlCli').classList.remove('on');}
 function salvaCli(){
   const n=document.getElementById('nNome').value.trim(),e=document.getElementById('nEmail').value.trim();
   if(!n||!e){toast('Nome ed email obbligatori','wrn');return;}
+  const pac=document.getElementById('nPacchetto')?.value||'';
   if(window._editCliId){
     const idx=db.clienti.findIndex(c=>c.id==window._editCliId);
-    if(idx>=0) db.clienti[idx]={...db.clienti[idx],nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value};
+    if(idx>=0) db.clienti[idx]={...db.clienti[idx],nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value,pacchetto:pac};
     window._editCliId=null;
     saveDB();closeOvl();renderClienti();toast('✓ Cliente aggiornato','suc');
   }else{
-    db.clienti.push({id:Date.now(),nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value});
+    db.clienti.push({id:Date.now(),nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value,pacchetto:pac});
     saveDB();closeOvl();renderClienti();toast('✓ Cliente aggiunto','suc');
   }
 }
@@ -4028,7 +4064,8 @@ function renderDash(){
   const totKm=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseInt(g.km||0),s),0);
   const inviati=list.filter(r=>r.stato==='Inviato'||r.stato==='Firmato').length;
   const clientiUnici=[...new Set(list.map(r=>r.cliente))].length;
-  const totPranzi=list.reduce((s,r)=>(r.giornate||[]).filter(g=>g.pranzo).length+s,0);
+  const isTelRT=r=>r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+  const totMinTel=list.filter(isTelRT).reduce((s,r)=>s+(r.minutiUsati||0),0);
 
   document.getElementById('dashKPI').innerHTML=`
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
@@ -4059,17 +4096,22 @@ function renderDash(){
       <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${clientiUnici}</div>
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Clienti</div>
     </div>
-    <div class="card" style="border-left:3px solid var(--warn);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--warn)">${totPranzi}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Pranzi/Cene</div>
+    <div class="card" style="border-left:3px solid #06b6d4;padding:12px">
+      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totMinTel}</div>
+      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Min. telefonica</div>
     </div>`;
 
   // ── TABELLA PER CLIENTE ──
   const byClient={};
   list.forEach(r=>{
-    if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,ore:0,km:0,viag:0,inviati:0};
+    const isTel=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+    if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,ore:0,km:0,viag:0,inviati:0,minTel:0};
     byClient[r.cliente].rt++;
-    (r.giornate||[]).forEach(g=>{byClient[r.cliente].ore+=parseFloat(g.oreLav||0);byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
+    if(isTel){
+      byClient[r.cliente].minTel+=(r.minutiUsati||0);
+    } else {
+      (r.giornate||[]).forEach(g=>{byClient[r.cliente].ore+=parseFloat(g.oreLav||0);byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
+    }
     if(r.stato==='Inviato'||r.stato==='Firmato') byClient[r.cliente].inviati++;
   });
   const rows=Object.values(byClient).sort((a,b)=>b.ore-a.ore);
@@ -4083,6 +4125,7 @@ function renderDash(){
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">ORE</th>
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">VIAG.</th>
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">KM</th>
+            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#22d3ee;font-weight:700;letter-spacing:.5px">TEL.</th>
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">INV.</th>
           </tr>
         </thead>
@@ -4094,6 +4137,7 @@ function renderDash(){
               <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.ore.toFixed(1)}</td>
               <td style="text-align:center;padding:7px 4px;color:#a78bfa">${r.viag.toFixed(1)}</td>
               <td style="text-align:center;padding:7px 4px;color:var(--warn)">${r.km}</td>
+              <td style="text-align:center;padding:7px 4px;color:#22d3ee">${r.minTel||0}'</td>
               <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${r.inviati}/${r.rt}</td>
             </tr>`).join('')}
         </tbody>
@@ -4104,6 +4148,7 @@ function renderDash(){
             <td style="text-align:center;padding:7px 4px;color:#2ecc71">${rows.reduce((s,r)=>s+r.ore,0).toFixed(1)}</td>
             <td style="text-align:center;padding:7px 4px;color:#a78bfa">${rows.reduce((s,r)=>s+r.viag,0).toFixed(1)}</td>
             <td style="text-align:center;padding:7px 4px;color:var(--warn)">${rows.reduce((s,r)=>s+r.km,0)}</td>
+            <td style="text-align:center;padding:7px 4px;color:#22d3ee">${rows.reduce((s,r)=>s+(r.minTel||0),0)}'</td>
             <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${rows.reduce((s,r)=>s+r.inviati,0)}</td>
           </tr>
         </tfoot>
@@ -4112,30 +4157,73 @@ function renderDash(){
     document.getElementById('dashTabCli').innerHTML='<div style="font-size:12px;color:var(--tx3);padding:8px 0">Nessun dato per il periodo selezionato</div>';
   }
 
-  // ── Lista rapportini ultimi 7 giorni ──
-  const cutoff7=new Date();cutoff7.setDate(cutoff7.getDate()-7);cutoff7.setHours(0,0,0,0);
-  const last7=db.rapportini.filter(r=>r.dataCreazione&&new Date(r.dataCreazione)>=cutoff7)
-    .sort((a,b)=>new Date(b.dataCreazione)-new Date(a.dataCreazione));
-  document.getElementById('dashListRT').innerHTML=last7.length?last7.map(r=>{
-    const tO=(r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
-    const tK=(r.giornate||[]).reduce((s,g)=>s+parseInt(g.km||0),0);
-    return `<div class="card" onclick="openDet('${r.id}')" style="cursor:pointer;border-left:2px solid var(--b2);padding:10px 13px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <span class="rtt" style="font-size:14px">${r.numRT}</span>
-          ${r.isPrelim?'<span class="bdg bdg-preliminary" style="margin-left:5px">PRELIM</span>':''}
-          <div class="ct" style="margin-top:2px">${r.cliente}</div>
-          <div class="cs">${r.tecnici||''} · ${r.tipo}</div>
-        </div>
-        <span class="bdg bdg-${r.stato.toLowerCase()}">${r.stato}</span>
-      </div>
-      <div style="display:flex;gap:11px;font-size:11px;color:var(--tx3);margin-top:5px">
-        <span>📅 ${r.giornate?.length?r.giornate[0].data:'—'}</span>
-        <span>⏱ ${tO.toFixed(1)}h</span>
-        <span>🚗 ${tK}km</span>
-      </div>
-    </div>`;
-  }).join(''):'<div style="font-size:12px;color:var(--tx3);padding:20px 0;text-align:center">Nessun rapportino negli ultimi 7 giorni</div>';
+  // ── Grafici ──
+  renderDashCharts(list);
+}
+
+// Istanze Chart.js (per destroy prima di ri-creare)
+const _charts={};
+function destroyChart(id){if(_charts[id]){_charts[id].destroy();delete _charts[id];}}
+
+function renderDashCharts(list){
+  // Palette colori
+  const PAL=['#8B1A1A','#2ecc71','#06b6d4','#a78bfa','#f59e0b','#ef4444','#3b82f6','#10b981'];
+
+  // ── 1. RT per tipo intervento (doughnut) ──
+  destroyChart('tipo');
+  const byTipo={};
+  list.forEach(r=>{const t=r.tipo||'—';byTipo[t]=(byTipo[t]||0)+1;});
+  const tipoLabels=Object.keys(byTipo);
+  const tipoData=tipoLabels.map(t=>byTipo[t]);
+  const ctxT=document.getElementById('chartTipo');
+  if(ctxT&&tipoLabels.length){
+    _charts['tipo']=new Chart(ctxT,{
+      type:'doughnut',
+      data:{labels:tipoLabels,datasets:[{data:tipoData,backgroundColor:PAL.slice(0,tipoLabels.length),borderWidth:0}]},
+      options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#aaa',font:{size:11},boxWidth:12}}}}
+    });
+  }else if(ctxT){ctxT.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
+
+  // ── 2. Ore per cliente in loco (bar orizzontale) ──
+  destroyChart('cliore');
+  const byCliOre={};
+  list.filter(r=>r.tipo!=='Assistenza Telefonica'&&r.tipoServizio!=='Telefonica')
+    .forEach(r=>{const c=r.cliente||'—';(r.giornate||[]).forEach(g=>{byCliOre[c]=(byCliOre[c]||0)+parseFloat(g.oreLav||0);});});
+  const cliLabels=Object.keys(byCliOre).sort((a,b)=>byCliOre[b]-byCliOre[a]).slice(0,8);
+  const cliData=cliLabels.map(c=>+byCliOre[c].toFixed(1));
+  const ctxC=document.getElementById('chartCliOre');
+  if(ctxC&&cliLabels.length){
+    _charts['cliore']=new Chart(ctxC,{
+      type:'bar',
+      data:{labels:cliLabels,datasets:[{label:'Ore',data:cliData,backgroundColor:'#2ecc71aa',borderColor:'#2ecc71',borderWidth:1}]},
+      options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{
+        x:{ticks:{color:'#aaa',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},
+        y:{ticks:{color:'#ccc',font:{size:10}},grid:{display:false}}
+      }}
+    });
+  }else if(ctxC){ctxC.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
+
+  // ── 3. Andamento mensile RT (line) ──
+  destroyChart('mensile');
+  const byMese={};
+  list.forEach(r=>{
+    const d=r.dataCreazione?r.dataCreazione.substring(0,7):'';
+    if(d) byMese[d]=(byMese[d]||0)+1;
+  });
+  const meseKeys=Object.keys(byMese).sort().slice(-12);
+  const meseLabels=meseKeys.map(k=>{const [y,m]=k.split('-');return ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][parseInt(m)-1];});
+  const meseData=meseKeys.map(k=>byMese[k]);
+  const ctxM=document.getElementById('chartMensile');
+  if(ctxM&&meseKeys.length){
+    _charts['mensile']=new Chart(ctxM,{
+      type:'line',
+      data:{labels:meseLabels,datasets:[{label:'RT',data:meseData,borderColor:'#8B1A1A',backgroundColor:'rgba(139,26,26,.15)',tension:.3,fill:true,pointBackgroundColor:'#8B1A1A',pointRadius:4}]},
+      options:{responsive:true,plugins:{legend:{display:false}},scales:{
+        x:{ticks:{color:'#aaa',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},
+        y:{ticks:{color:'#aaa',font:{size:10},stepSize:1},grid:{color:'rgba(255,255,255,.05)'}}
+      }}
+    });
+  }else if(ctxM){ctxM.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
 }
 
 // ══════════════════════════════════════
