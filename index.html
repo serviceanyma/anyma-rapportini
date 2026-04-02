@@ -843,6 +843,10 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         <select class="fc" id="dashCli" onchange="renderDash()"></select>
       </div>
     </div>
+    <button class="btn bgh bfl bsm" style="margin-top:8px" onclick="dashSyncSP()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Aggiorna da SharePoint
+    </button>
   </div>
 
   <!-- KPI cards -->
@@ -996,7 +1000,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v118';
+const APP_VERSION='v120';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1019,6 +1023,31 @@ const t2m=t=>{if(!t||t==='—'||t==='')return -1;const[h,m]=t.split(':').map(Num
 const m2t=m=>m<0?'':String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 
 // Build <select> with 30min steps
+// Select orario Fine per Teleassistenza: mostra solo slot >= inizio+30min
+function tSelTA(inizio, val, onch){
+  const slots=[];
+  for(let hh=0;hh<=24;hh++) for(let mm=0;mm<60;mm+=30){
+    if(hh===24&&mm>0) break;
+    slots.push(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));
+  }
+  // Calcola slot minimo: inizio + 30 min
+  let minSlot='';
+  if(inizio){
+    const [hh,mm]=inizio.split(':').map(Number);
+    const tot=hh*60+mm+30;
+    const hh2=Math.floor(tot/60);
+    const mm2=tot%60;
+    if(hh2<=24) minSlot=String(hh2).padStart(2,'0')+':'+String(mm2).padStart(2,'0');
+  }
+  const minIdx=minSlot?slots.indexOf(minSlot):0;
+  const available=minIdx>=0?slots.slice(minIdx):slots;
+  let o='<option value="">—</option>';
+  available.forEach(v=>{
+    o+=`<option value="${v}"${v===val?' selected':''}>${v}</option>`;
+  });
+  return `<select class="fc"${''} onchange="${onch}">${o}</select>`;
+}
+
 function tSel(val,onch,style=''){
   // Genera lista da 00:00 a 24:00 a step 30min
   const slots=[];
@@ -1675,11 +1704,18 @@ function delSessioneTA(i){
 
 function updSessioneTA(i,f,v){
   taSessioni[i][f]=v;
+  // Se cambia inizio, resetta fine se non è almeno 30min dopo
+  if(f==='inizio'&&taSessioni[i].fine){
+    const durCheck=calcDurataMin(taSessioni[i].inizio,taSessioni[i].fine);
+    if(durCheck<30) taSessioni[i].fine='';
+  }
   const dur=calcDurataMin(taSessioni[i].inizio,taSessioni[i].fine);
   taSessioni[i].durata=dur;
   aggiornaTotaliTA();
   const durEl=document.getElementById(`taDur_${i}`);
   if(durEl) durEl.textContent=dur+' min';
+  // Re-render per aggiornare opzioni select Fine
+  if(f==='inizio') renderSessioniTA();
 }
 
 function updOreMinTA(i,campo,tipo,val){
@@ -1718,7 +1754,7 @@ function renderSessioniTA(){
         </div>
         <div class="fg" style="margin:0">
           <label class="fl">Fine</label>
-          ${tSel(s.fine,`updSessioneTA(${i},'fine',this.value)`)}
+          ${tSelTA(s.inizio,s.fine,`updSessioneTA(${i},'fine',this.value)`)}
         </div>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -4649,6 +4685,24 @@ async function uploadPDFToOneDrive(filename,pdfBlob){
 const MESI_IT=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
 
+async function dashSyncSP(){
+  if(!m365Token){toast('Accedi prima con Microsoft','wrn');return;}
+  const btn=document.querySelector('#scrDash .btn.bgh.bfl');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Sincronizzazione...';}
+  try{
+    toast('☁️ Caricamento RT da SharePoint...','wrn');
+    const n=await spLoadRapportini();
+    initDash();
+    renderHome();
+    toast(`✓ ${n} rapportini caricati da SP`,'suc',4000);
+  }catch(e){
+    toast('⚠️ Errore sync SP: '+e.message,'err',6000);
+    console.error('dashSyncSP:',e);
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Aggiorna da SharePoint';}
+  }
+}
+
 function initDash(){
   const annoCorrente=new Date().getFullYear();
   // Raccogli anni dai rapportini
@@ -4667,6 +4721,10 @@ function initDash(){
   const clientiList=[...new Set(db.rapportini.map(r=>r.cliente).filter(Boolean))].sort();
   selC.innerHTML='<option value="">Tutti i clienti</option>'+clientiList.map(c=>`<option value="${c}">${c}</option>`).join('');
   renderDash();
+  // Se non ci sono RT locali ma c'è token SP, carica automaticamente
+  if(m365Token&&db.rapportini.length===0){
+    setTimeout(()=>dashSyncSP(),500);
+  }
 }
 
 function getDashFiltered(){
