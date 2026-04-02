@@ -992,7 +992,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v105';
+const APP_VERSION='v106';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1470,9 +1470,8 @@ function aggiornaTotaliTel(){
   const pac=contr.pacchetto||'Spot';
   let totMin=0;
   telChiamate.forEach(c=>{
-    const dur=calcDurataMin(c.inizio,c.fine);
-    c.durata=dur;
-    c.arrotondamento=dur; // durata effettiva per riga
+    const dur=parseInt(c.durata||0);
+    if(c.inizio&&dur) c.fine=calcFineFromDurata(c.inizio,dur);
     totMin+=dur;
   });
   // Arrotondamento sul TOTALE (tipo+pacchetto)
@@ -1505,16 +1504,19 @@ function selMin(val,onch){
   for(let i=0;i<60;i++) o+=`<option value="${String(i).padStart(2,'0')}"${i===mm?' selected':''}>${String(i).padStart(2,'0')}</option>`;
   return `<select class="fc" style="width:auto;flex:1" onchange="${onch}">${o}</select>`;
 }
-function updOreMin(i,campo,tipo,val){
-  const cur=telChiamate[i][campo]||'';
+function updOreMin(i,tipo,val){
+  const cur=telChiamate[i].inizio||'';
   const parts=cur.split(':');
   let hh=parts[0]||'';
   let mm=parts[1]||'00';
-  if(tipo==='h') hh=val;
-  else mm=val;
-  // Componi solo se almeno l'ora è definita
-  const nuovo=hh?(hh+':'+mm):'';
-  updChiamata(i,campo,nuovo);
+  if(tipo==='h') hh=val; else mm=val;
+  updChiamata(i,'inizio',hh?(hh+':'+mm):'');
+}
+function calcFineFromDurata(inizio,durataMn){
+  if(!inizio||!durataMn) return '';
+  const [hh,mm]=inizio.split(':').map(Number);
+  const tot=hh*60+mm+parseInt(durataMn);
+  return String(Math.floor(tot/60)%24).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
 }
 function calcDurataMin(inizio,fine){
   if(!inizio||!fine) return 0;
@@ -1544,8 +1546,7 @@ function updChiamata(i,f,v){
   const dur=calcDurataMin(telChiamate[i].inizio,telChiamate[i].fine);
   telChiamate[i].durata=dur;
   aggiornaTotaliTel();
-  const durEl=document.getElementById(`telDur_${i}`);
-  if(durEl) durEl.textContent=dur+' min';
+
 }
 
 function renderChiamate(){
@@ -1559,8 +1560,8 @@ function renderChiamate(){
   const contr=getContratto(cRT.cliente,'Telefonica');
   const pac=contr.pacchetto||'Spot';
   el.innerHTML=telChiamate.map((c,i)=>{
-    const dur=calcDurataMin(c.inizio,c.fine);
-    c.durata=dur;
+    const dur=parseInt(c.durata||0);
+    const fine=calcFineFromDurata(c.inizio,dur);
     return `<div class="gc" style="margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">📞 Chiamata ${i+1}</span>
@@ -1568,34 +1569,29 @@ function renderChiamate(){
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div style="margin-bottom:8px">
-        <div class="fr c2" style="margin-bottom:6px">
-          <div class="fg" style="margin:0">
-            <label class="fl">Inizio — Ora</label>
-            ${selOre(c.inizio,`updOreMin(${i},'inizio','h',this.value)`)}
-          </div>
-          <div class="fg" style="margin:0">
-            <label class="fl">Inizio — Min</label>
-            ${selMin(c.inizio,`updOreMin(${i},'inizio','m',this.value)`)}
-          </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:6px;margin-bottom:8px;align-items:end">
+        <div class="fg" style="margin:0">
+          <label class="fl">Ora inizio</label>
+          ${selOre(c.inizio,`updOreMin(${i},'h',this.value)`)}
         </div>
-        <div class="fr c2">
-          <div class="fg" style="margin:0">
-            <label class="fl">Fine — Ora</label>
-            ${selOre(c.fine,`updOreMin(${i},'fine','h',this.value)`)}
-          </div>
-          <div class="fg" style="margin:0">
-            <label class="fl">Fine — Min</label>
-            ${selMin(c.fine,`updOreMin(${i},'fine','m',this.value)`)}
-          </div>
+        <div class="fg" style="margin:0">
+          <label class="fl">Min inizio</label>
+          ${selMin(c.inizio,`updOreMin(${i},'m',this.value)`)}
+        </div>
+        <div class="fg" style="margin:0">
+          <label class="fl">Durata (min)</label>
+          <input type="number" class="fc" min="0" max="999" value="${dur||''}"
+            placeholder="0" style="text-align:center"
+            oninput="updChiamata(${i},'durata',this.value)">
+        </div>
+        <div class="fg" style="margin:0">
+          <label class="fl">Referente</label>
+          <input type="text" class="fc" value="${c.referente||''}" placeholder="Nome cognome"
+            onchange="updChiamata(${i},'referente',this.value)">
         </div>
       </div>
-      <div class="fg" style="margin-bottom:8px">
-        <label class="fl">Referente cliente</label>
-        <input type="text" class="fc" value="${c.referente||''}" placeholder="Nome cognome" onchange="updChiamata(${i},'referente',this.value)">
-      </div>
-      <div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)">
-        <span>⏱ Durata: <b id="telDur_${i}" style="color:var(--tx)">${dur} min</b></span>
+      <div style="font-size:11px;color:var(--tx3)">
+        ⏱ ${c.inizio||'—'} → <b id="telDur_${i}" style="color:var(--tx)">${fine||'—'}</b>
       </div>
     </div>`;
   }).join('');
@@ -2191,7 +2187,6 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
     return `<tr>
       <td class="tdl">${dataSess}</td>
       <td>${c.inizio||'—'}</td>
-      <td>${c.fine||'—'}</td>
       <td>${dur} min</td>
       <td style="color:#1e40af;font-size:8pt">—</td>
       <td class="tdl">${c.referente||'—'}</td>
@@ -2238,7 +2233,6 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
       <thead><tr>
         <th class="thl">${l==='IT'?'Data':'Date'}</th>
         <th>${l==='IT'?'Inizio':'Start'}</th>
-        <th>${l==='IT'?'Fine':'End'}</th>
         <th>${l==='IT'?'Effettivi':'Effective'}</th>
         <th>${l==='IT'?'Arrotondati':'Rounded'}</th>
         <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
