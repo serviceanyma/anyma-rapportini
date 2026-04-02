@@ -807,15 +807,15 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">RT per tipo intervento</div>
-    <canvas id="chartTipo" height="180"></canvas>
+    <canvas id="chartTipo" height="120"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Ore per cliente (in loco)</div>
-    <canvas id="chartCliOre" height="180"></canvas>
+    <canvas id="chartCliOre" height="120"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Andamento mensile RT</div>
-    <canvas id="chartMensile" height="160"></canvas>
+    <canvas id="chartMensile" height="100"></canvas>
   </div>
   <div style="height:75px"></div>
 </div>
@@ -860,15 +860,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
     <div class="fg"><label class="fl">Email *</label><input type="email" class="fc" id="nEmail"></div>
     <div class="fg"><label class="fl">Indirizzo</label><textarea class="fc" id="nAddr" style="min-height:65px" placeholder="Via, numero&#10;CAP Città&#10;Paese"></textarea></div>
     <div class="fg"><label class="fl">Telefono</label><input type="tel" class="fc" id="nTel"></div>
-    <div class="fg"><label class="fl">Pacchetto telefonica</label>
-      <select class="fc" id="nPacchetto">
-        <option value="">— Nessun contratto —</option>
-        <option value="Spot">Spot</option>
-        <option value="Pack4h">Pack 4h</option>
-        <option value="Pack15h">Pack 15h</option>
-        <option value="Unlimited">Unlimited</option>
-      </select>
-    </div>
+    <!-- Pacchetti gestiti da AnymaContratti SP (sola lettura) -->
     <div style="display:flex;gap:9px;margin-top:14px;padding-bottom:4px">
       <button class="btn bgh" style="flex:1" onclick="closeOvl()">Annulla</button>
       <button class="btn bp" style="flex:1" onclick="salvaCli()">Salva</button>
@@ -954,7 +946,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v97';
+const APP_VERSION='v99';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1315,7 +1307,8 @@ function goStep(s){
     document.getElementById('inAtt').value=cRT.attivita||'';
     renderGio();showScr('scrGio');switchGioMode();
   }else if(s===1){
-    // Back to Dati
+    // Back to Dati — salva chiamate prima di uscire
+    if(isTelefonica()) cRT.chiamate=telChiamate.map(c=>({...c}));
     populateDDs();document.getElementById('inRT').value=cRT.numRT;
     const c=db.clienti.find(x=>x.nome===cRT.cliente);if(c)document.getElementById('inCli').value=c.id;
     document.getElementById('inEmail').value=cRT.clienteEmail||'';
@@ -1392,9 +1385,9 @@ let telChiamate=[];
 
 // Inizializza sezione telefonica quando si entra nello step giornate
 function initTelefonica(){
-  const contr=getContratto(cRT.cliente);
+  const contr=getContratto(cRT.cliente,'Telefonica');
   cRT.pacchetto=contr.pacchetto;
-  cRT.saldoPrima=contr.saldo;
+  cRT.saldoPrima=contr.saldoMinuti||0;
   cRT.tipoServizio='Telefonica';
   // Ripristina chiamate esistenti o inizia con array vuoto
   telChiamate=(cRT.chiamate||[]).slice();
@@ -1408,19 +1401,19 @@ function initTelefonica(){
 }
 
 function aggiornaTelInfo(){
-  const contr=getContratto(cRT.cliente);
+  const contr=getContratto(cRT.cliente,'Telefonica');
   const pacEl=document.getElementById('telPacchetto');
   const saldoEl=document.getElementById('telSaldo');
   if(pacEl) pacEl.textContent=contr.pacchetto||'Spot';
   if(saldoEl){
-    if(contr.pacchetto==='Spot'||contr.pacchetto==='Unlimited') saldoEl.textContent='N/A';
-    else saldoEl.textContent=contr.saldo+' min';
+    if(contr.pacchetto==='Spot'||contr.pacchetto==='Premium') saldoEl.textContent='N/A';
+    else saldoEl.textContent=(contr.saldoMinuti||0)+' min';
   }
   aggiornaTotaliTel();
 }
 
 function aggiornaTotaliTel(){
-  const contr=getContratto(cRT.cliente);
+  const contr=getContratto(cRT.cliente,'Telefonica');
   const pac=contr.pacchetto||'Spot';
   let totMin=0;
   telChiamate.forEach(c=>{
@@ -1429,13 +1422,13 @@ function aggiornaTotaliTel(){
     c.arrotondamento=dur; // durata effettiva per riga
     totMin+=dur;
   });
-  // FIX: arrotondamento sul TOTALE, non per singola chiamata
-  const totArr=arrotondaMinuti(totMin,pac);
+  // Arrotondamento sul TOTALE (tipo+pacchetto)
+  const totArr=arrotondaUnita(totMin,'Telefonica',pac);
   cRT.minutiUsati=totArr;
   // Saldo dopo
   let saldoDopo=null;
-  if(pac!=='Spot'&&pac!=='Unlimited'){
-    saldoDopo=Math.max(0,(contr.saldo||0)-totArr);
+  if(pac!=='Spot'&&pac!=='Premium'){
+    saldoDopo=Math.max(0,(contr.saldoMinuti||0)-totArr);
     cRT.saldoDopo=saldoDopo;
   }
   const elMin=document.getElementById('telTotMin');
@@ -1460,14 +1453,14 @@ function selMin(val,onch){
   return `<select class="fc" style="width:auto;flex:1" onchange="${onch}">${o}</select>`;
 }
 function updOreMin(i,campo,tipo,val){
-  // tipo = 'h' o 'm', campo = 'inizio' o 'fine'
   const cur=telChiamate[i][campo]||'';
   const parts=cur.split(':');
   let hh=parts[0]||'';
-  let mm=parts[1]||'';
+  let mm=parts[1]||'00';
   if(tipo==='h') hh=val;
   else mm=val;
-  const nuovo=(hh&&mm)?hh+':'+mm:'';
+  // Componi solo se almeno l'ora è definita
+  const nuovo=hh?(hh+':'+mm):'';
   updChiamata(i,campo,nuovo);
 }
 function calcDurataMin(inizio,fine){
@@ -1510,7 +1503,7 @@ function renderChiamate(){
     aggiornaTotaliTel();
     return;
   }
-  const contr=getContratto(cRT.cliente);
+  const contr=getContratto(cRT.cliente,'Telefonica');
   const pac=contr.pacchetto||'Spot';
   el.innerHTML=telChiamate.map((c,i)=>{
     const dur=calcDurataMin(c.inizio,c.fine);
@@ -1987,12 +1980,12 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
   const dataSess=rt.chiamate_data||'';
   const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
   const logoB64=LOGO_PDF;
-  const saldoPrima=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoPrima||0);
-  const saldoDopo=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoDopo||0);
+  const saldoPrima=(pac==='Spot'||pac==='Premium')?null:(rt.saldoPrima||0);
+  const saldoDopo=(pac==='Spot'||pac==='Premium')?null:(rt.saldoDopo||0);
 
   // Tabella chiamate — arrotondamento sul TOTALE
   const totDur=chiamate.reduce((s,c)=>s+(c.durata||calcDurataMin(c.inizio,c.fine)),0);
-  const totArr=arrotondaMinuti(totDur,pac);
+  const totArr=arrotondaUnita(totDur,'Telefonica',pac);
   const saldoDopoCalc=(saldoPrima!==null)?Math.max(0,saldoPrima-totArr):null;
   const rows=chiamate.map((c,i)=>{
     const dur=c.durata||calcDurataMin(c.inizio,c.fine);
@@ -2030,12 +2023,8 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
         <b>${l==='IT'?'Tecnico':'Technician'}:</b> ${rt.tecnici||''}
       </div>
       <div class="pdf-box">
-        ${(()=>{
-          const cliObj=db.clienti.find(c=>c.nome===rt.cliente)||{};
-          const rawAddr=cliObj.indirizzo||rt.clienteAddr||'';
-          const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA \${cliObj.piva}`:'')).trim();
-          return `<b>\${rt.cliente}</b><br>\${addrLines}`;
-        })()}
+        <strong>${rt.cliente}</strong><br>
+        ${(()=>{const o=db.clienti.find(c=>c.nome===rt.cliente)||{};const r=o.indirizzo||rt.clienteAddr||'';return (r.split('\n').filter(Boolean).join('<br>')+(o.piva?'<br>P.IVA '+o.piva:'')).trim();})()}
       </div>
     </div>
     <div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
@@ -2521,7 +2510,17 @@ async function salva(invia){
 
   // Se Telefonica: aggiorna saldo contratto su SP
   if(isTelefonica()&&cRT.minutiUsati>0){
-    spAggiornaSaldo(cRT.cliente, cRT.minutiUsati).catch(e=>console.warn('saldo update:',e));
+    spAggiornaSaldo(cRT.cliente,'Telefonica',cRT.minutiUsati).catch(e=>console.warn('saldo update:',e));
+  }
+  // Teleassistenza: scala ore da contratto
+  if(cRT.tipo==='Teleassistenza'){
+    const totOreTA=(cRT.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
+    if(totOreTA>0) spAggiornaSaldo(cRT.cliente,'Teleassistenza',totOreTA).catch(e=>console.warn('saldo TA:',e));
+  }
+  // Manutenzione: scala ore da contratto
+  if(cRT.tipo==='Manutenzione Ordinaria'||cRT.tipo==='Manutenzione Straordinaria'){
+    const totOreMan=(cRT.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
+    if(totOreMan>0) spAggiornaSaldo(cRT.cliente,'Manutenzione',totOreMan).catch(e=>console.warn('saldo Man:',e));
   }
 
   if(invia){
@@ -2796,7 +2795,19 @@ function openSkedaCli(id){
         ${c.email?`<div><div class="fl">Email</div><div style="color:var(--tx)">${c.email}</div></div>`:''}
         ${c.tel?`<div><div class="fl">Telefono</div><div style="color:var(--tx)">${c.tel}</div></div>`:''}
         ${c.indirizzo||c.localita||c.comune?`<div><div class="fl">Indirizzo</div><div style="color:var(--tx);white-space:pre-line">${c.indirizzo||[c.comune,c.localita].filter(Boolean).join(', ')}</div></div>`:''}
-        ${(()=>{const contr=getContratto(c.nome);const pac=c.pacchetto||contr?.pacchetto||'';return pac?`<div><div class="fl">Pacchetto telefonica</div><div style="color:#22d3ee;font-weight:700">${pac}</div></div>`:''})()}
+        ${(()=>{
+          const contratti=db.contratti.filter(x=>x.cliente===c.nome&&x.attivo!==false);
+          if(!contratti.length) return '';
+          const TIPO_COLOR={Telefonica:'#f97316',Teleassistenza:'#06b6d4',Manutenzione:'#2ecc71'};
+          return contratti.map(x=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+              <div><div class="fl">${x.tipoContratto}</div><div style="color:${TIPO_COLOR[x.tipoContratto]||'var(--tx)'};font-weight:700">${x.pacchetto}</div></div>
+              <div style="text-align:right;font-size:11px;color:var(--tx3)">
+                ${x.tipoContratto==='Telefonica'&&x.saldoMinuti?'<span style="color:#f97316">'+x.saldoMinuti+" min</span>":''}
+                ${x.tipoContratto!=='Telefonica'&&x.saldoOre?'<span style="color:'+TIPO_COLOR[x.tipoContratto]+'">'+x.saldoOre+" h</span>":''}
+              </div>
+            </div>`).join('');
+        })()}
         ${c.piva?`<div><div class="fl">P.IVA / C.F.</div><div style="color:var(--tx)">${c.piva}</div></div>`:''}
         ${c.sito?`<div><div class="fl">Sito web</div><a href="${c.sito}" target="_blank" style="color:var(--cr2)">${c.sito}</a></div>`:''}
         ${c.referente?`<div><div class="fl">Referente ANYMA</div><div style="color:var(--tx)">${c.referente}</div></div>`:''}
@@ -2825,7 +2836,7 @@ function editCliOvl(id){
     document.getElementById('nAddr').value=c.indirizzo||'';
     const nLoc=document.getElementById('nLocalita');if(nLoc)nLoc.value=c.localita||'';
     document.getElementById('nTel').value=c.tel||'';
-    const nPac=document.getElementById('nPacchetto');if(nPac)nPac.value=c.pacchetto||'';
+    // Pacchetti da SP AnymaContratti (sola lettura)
     document.getElementById('ovlCli').classList.add('on');
   },50);
 }
@@ -2834,14 +2845,13 @@ function closeOvl(){document.getElementById('ovlCli').classList.remove('on');}
 function salvaCli(){
   const n=document.getElementById('nNome').value.trim(),e=document.getElementById('nEmail').value.trim();
   if(!n||!e){toast('Nome ed email obbligatori','wrn');return;}
-  const pac=document.getElementById('nPacchetto')?.value||'';
   if(window._editCliId){
     const idx=db.clienti.findIndex(c=>c.id==window._editCliId);
-    if(idx>=0) db.clienti[idx]={...db.clienti[idx],nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value,pacchetto:pac};
+    if(idx>=0) db.clienti[idx]={...db.clienti[idx],nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value};
     window._editCliId=null;
     saveDB();closeOvl();renderClienti();toast('✓ Cliente aggiornato','suc');
   }else{
-    db.clienti.push({id:Date.now(),nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value,pacchetto:pac});
+    db.clienti.push({id:Date.now(),nome:n,email:e,indirizzo:document.getElementById('nAddr').value,tel:document.getElementById('nTel').value});
     saveDB();closeOvl();renderClienti();toast('✓ Cliente aggiunto','suc');
   }
 }
@@ -3607,6 +3617,127 @@ async function spDeleteRapportino(spId){
 }
 
 // ══════════════════════════════════════
+// ANYMA CONTRATTI — struttura unificata
+// TipoContratto: Telefonica / Teleassistenza / Manutenzione
+// Pacchetto: Spot / Base / Standard / Premium
+// SaldoMinuti: solo Telefonica Base/Standard
+// SaldoOre: Teleassistenza Base/Standard, Manutenzione Base/Standard
+// ══════════════════════════════════════
+
+// Arrotondamento in base a tipo+pacchetto
+// Restituisce minuti arrotondati (input: minuti effettivi)
+function arrotondaUnita(durata, tipoContratto, pacchetto){
+  if(tipoContratto==='Telefonica'){
+    if(pacchetto==='Base') return Math.ceil(durata/5)*5;     // 5 min successivi
+    if(pacchetto==='Standard') return Math.ceil(durata);      // 1 min successivo
+    return durata; // Spot e Premium: nessun arrotondamento
+  }
+  if(tipoContratto==='Teleassistenza'){
+    if(pacchetto==='Base'||pacchetto==='Standard')
+      return Math.ceil(durata/30)*30; // 30 min successivi
+    return durata;
+  }
+  if(tipoContratto==='Manutenzione'){
+    return durata; // nessun arrotondamento (ore lavoro dirette)
+  }
+  return durata;
+}
+
+// Mantieni compatibilità con codice esistente Telefonica
+function arrotondaMinuti(durataMn, pacchetto){
+  // Mappa vecchi nomi → nuovi
+  const p=pacchetto==='Pack4h'?'Base':pacchetto==='Pack15h'?'Standard':pacchetto;
+  return arrotondaUnita(durataMn,'Telefonica',p);
+}
+
+// Ottieni contratto attivo per cliente+tipo
+function getContratto(nomeCliente, tipoContratto){
+  const tipo=tipoContratto||'Telefonica';
+  // Cerca in db.contratti (cache SP)
+  const found=db.contratti.find(c=>
+    c.cliente===nomeCliente &&
+    c.tipoContratto===tipo &&
+    c.attivo!==false
+  );
+  if(found) return found;
+  // Fallback: Spot senza saldo
+  return {cliente:nomeCliente,tipoContratto:tipo,pacchetto:'Spot',saldoMinuti:0,saldoOre:0};
+}
+
+// Carica lista AnymaContratti da SP
+async function spLoadContratti(){
+  if(!m365Token) return;
+  const sid=await spGetSiteId();
+  const tok=await m365GetToken();
+  if(!tok) return;
+  const listName=db.config.spListContratti||'AnymaContratti';
+  let listId=db.config._spContrListId;
+  if(!listId){
+    try{
+      const r=await fetch(`${GRAPH}/sites/${sid}/lists?$filter=displayName eq '${listName}'`,
+        {headers:{Authorization:`Bearer ${tok}`}});
+      const d=await r.json();
+      listId=d.value?.[0]?.id;
+      if(listId){db.config._spContrListId=listId;saveDB();}
+    }catch(e){return;}
+  }
+  if(!listId) return;
+  try{
+    const r=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=500`,
+      {headers:{Authorization:`Bearer ${tok}`}});
+    const d=await r.json();
+    db.contratti=(d.value||[]).map(item=>{
+      const f=item.fields;
+      return {
+        _spId:      item.id,
+        cliente:    f.Title||f.Cliente||'',
+        tipoContratto: f.TipoContratto||'Telefonica',
+        pacchetto:  f.Pacchetto||'Spot',
+        saldoMinuti:parseInt(f.SaldoMinuti||0),
+        saldoOre:   parseFloat(f.SaldoOre||0),
+        dataInizio: f.DataInizio||'',
+        dataFine:   f.DataFine||'',
+        numContratto:f.NumContratto||'',
+        attivo:     f.Attivo!==false&&f.Attivo!=='false',
+        note:       f.Note||'',
+      };
+    });
+    saveDB();
+  }catch(e){console.warn('spLoadContratti error',e);}
+}
+
+// Aggiorna saldo su SP dopo intervento
+async function spAggiornaSaldo(nomeCliente, tipoContratto, unitaScalate){
+  if(!m365Token) return;
+  const contr=getContratto(nomeCliente, tipoContratto);
+  if(!contr._spId) return;
+  if(contr.pacchetto==='Spot'||contr.pacchetto==='Premium') return;
+  const sid=await spGetSiteId();
+  const tok=await m365GetToken();
+  const listId=db.config._spContrListId;
+  if(!listId||!tok) return;
+  // Determina quale campo scalare
+  let fields={};
+  if(tipoContratto==='Telefonica'){
+    const nuovoSaldo=Math.max(0,contr.saldoMinuti-unitaScalate);
+    fields={SaldoMinuti:nuovoSaldo};
+    contr.saldoMinuti=nuovoSaldo;
+  } else {
+    const nuovoSaldo=Math.max(0,contr.saldoOre-unitaScalate);
+    fields={SaldoOre:nuovoSaldo};
+    contr.saldoOre=nuovoSaldo;
+  }
+  try{
+    await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${contr._spId}/fields`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+      body:JSON.stringify(fields)
+    });
+    saveDB();
+  }catch(e){console.warn('spAggiornaSaldo error',e);}
+}
+
+// ══════════════════════════════════════
 // CARICA TIPI DA COLONNA SP (scelta)
 // ══════════════════════════════════════
 async function spLoadTipi(){
@@ -4109,21 +4240,24 @@ function renderDash(){
       <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${clientiUnici}</div>
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Clienti</div>
     </div>
-    <div class="card" style="border-left:3px solid #06b6d4;padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totMinTel}</div>
+    <div class="card" style="border-left:3px solid #f97316;padding:12px">
+      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#f97316">${totMinTel}'</div>
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Min. telefonica</div>
     </div>`;
 
   // ── TABELLA PER CLIENTE ──
   const byClient={};
   list.forEach(r=>{
-    const isTel=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
-    if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,ore:0,km:0,viag:0,inviati:0,minTel:0};
+    const isTelAs=r.tipo==='Teleassistenza';
+    const isTelFon=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+    if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,oreLoco:0,km:0,viag:0,oreTeleass:0,minTel:0,inviati:0};
     byClient[r.cliente].rt++;
-    if(isTel){
+    if(isTelFon){
       byClient[r.cliente].minTel+=(r.minutiUsati||0);
+    } else if(isTelAs){
+      (r.giornate||[]).forEach(g=>{byClient[r.cliente].oreTeleass+=parseFloat(g.oreLav||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
     } else {
-      (r.giornate||[]).forEach(g=>{byClient[r.cliente].ore+=parseFloat(g.oreLav||0);byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
+      (r.giornate||[]).forEach(g=>{byClient[r.cliente].oreLoco+=parseFloat(g.oreLav||0);byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
     }
     if(r.stato==='Inviato'||r.stato==='Firmato') byClient[r.cliente].inviati++;
   });
@@ -4135,10 +4269,10 @@ function renderDash(){
           <tr style="border-bottom:2px solid var(--cr)">
             <th style="text-align:left;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">CLIENTE</th>
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">RT</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">ORE</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">VIAG.</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">KM</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#22d3ee;font-weight:700;letter-spacing:.5px">TEL.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#2ecc71;font-weight:700;letter-spacing:.5px">ORE LOCO</th>
+            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#a78bfa;font-weight:700;letter-spacing:.5px">ORE VIAG.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#06b6d4;font-weight:700;letter-spacing:.5px">ORE TELEASS.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#f97316;font-weight:700;letter-spacing:.5px">MIN TEL.</th>
             <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">INV.</th>
           </tr>
         </thead>
@@ -4147,10 +4281,10 @@ function renderDash(){
             <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''}">
               <td style="padding:7px 4px;font-weight:600;color:var(--tx)">${r.nome}</td>
               <td style="text-align:center;padding:7px 4px;color:var(--cr2);font-weight:700">${r.rt}</td>
-              <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.ore.toFixed(1)}</td>
+              <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.oreLoco.toFixed(1)}</td>
               <td style="text-align:center;padding:7px 4px;color:#a78bfa">${r.viag.toFixed(1)}</td>
-              <td style="text-align:center;padding:7px 4px;color:var(--warn)">${r.km}</td>
-              <td style="text-align:center;padding:7px 4px;color:#22d3ee">${r.minTel||0}'</td>
+              <td style="text-align:center;padding:7px 4px;color:#06b6d4">${r.oreTeleass.toFixed(1)}</td>
+              <td style="text-align:center;padding:7px 4px;color:#f97316;font-weight:700">${r.minTel||0}'</td>
               <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${r.inviati}/${r.rt}</td>
             </tr>`).join('')}
         </tbody>
@@ -4158,10 +4292,10 @@ function renderDash(){
           <tr style="border-top:2px solid var(--b2);font-weight:700">
             <td style="padding:7px 4px;color:var(--tx2)">TOTALE</td>
             <td style="text-align:center;padding:7px 4px;color:var(--cr2)">${rows.reduce((s,r)=>s+r.rt,0)}</td>
-            <td style="text-align:center;padding:7px 4px;color:#2ecc71">${rows.reduce((s,r)=>s+r.ore,0).toFixed(1)}</td>
+            <td style="text-align:center;padding:7px 4px;color:#2ecc71">${rows.reduce((s,r)=>s+r.oreLoco,0).toFixed(1)}</td>
             <td style="text-align:center;padding:7px 4px;color:#a78bfa">${rows.reduce((s,r)=>s+r.viag,0).toFixed(1)}</td>
-            <td style="text-align:center;padding:7px 4px;color:var(--warn)">${rows.reduce((s,r)=>s+r.km,0)}</td>
-            <td style="text-align:center;padding:7px 4px;color:#22d3ee">${rows.reduce((s,r)=>s+(r.minTel||0),0)}'</td>
+            <td style="text-align:center;padding:7px 4px;color:#06b6d4">${rows.reduce((s,r)=>s+r.oreTeleass,0).toFixed(1)}</td>
+            <td style="text-align:center;padding:7px 4px;color:#f97316">${rows.reduce((s,r)=>s+(r.minTel||0),0)}'</td>
             <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${rows.reduce((s,r)=>s+r.inviati,0)}</td>
           </tr>
         </tfoot>
