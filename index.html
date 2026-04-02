@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v128';
+const APP_VERSION='v130';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1220,13 +1220,12 @@ function renderHome(){
         </div>
         <div style="display:flex;gap:11px;font-size:11px;color:var(--tx3)">
           <span>📅 ${r.giornate?.length?r.giornate[0].data:'—'}</span>
-          <span>⏱ ${tO.toFixed(1)}h</span>
           ${(()=>{
             const isTF=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
             const isTA=r.tipo==='Teleassistenza';
             if(isTF) return `<span>📞 ${r.minutiUsati||0} min</span>`;
             if(isTA) return `<span>💻 ${tO.toFixed(2)}h</span>`;
-            return `<span>🚗 ${tK}km</span>`;
+            return `<span>⏱ ${tO.toFixed(1)}h</span><span>🚗 ${tK}km</span>`;
           })()}
         </div>
       </div>
@@ -2340,7 +2339,7 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
       <thead><tr>
         <th class="thl">${l==='IT'?'Data':'Date'}</th>
         <th>${l==='IT'?'Inizio':'Start'}</th>
-        <th>${l==='IT'?'Durata':'Duration'}</th>
+        <th>${l==='IT'?'Durata (h)':'Duration (h)'}</th>
         <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -2377,7 +2376,7 @@ function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
       <td class="tdl">${dataTA}</td>
       <td>${s.inizio||'—'}</td>
       <td>${s.fine||'—'}</td>
-      <td>${dur} min</td>
+      <td>${parseFloat((dur/60).toFixed(2))} h</td>
       <td class="tdl">${s.referente||'—'}</td>
     </tr>`;
   }).join('');
@@ -2428,7 +2427,7 @@ function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td class="tdl" colspan="3"><b>${L.tot}</b></td>
-        <td><b>${totMin} min (${totOre} h)</b></td>
+        <td><b>${totOre} h</b></td>
         <td></td>
       </tr></tfoot>
     </table>
