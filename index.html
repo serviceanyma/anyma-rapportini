@@ -994,7 +994,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v115';
+const APP_VERSION='v116';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2173,11 +2173,17 @@ function salvaCfgF(){
   saveDB();
   toast('✓ Firma salvata in locale','suc');
   renderCfg();
-  // Salva su SP in background
+  // Salva su SP
   if(m365Token){
+    toast('☁️ Invio firma su SP...','wrn');
     spSalvaFirmaTecnico(firma)
-      .then(()=>toast('☁️ Firma sincronizzata su SP','suc'))
-      .catch(e=>console.warn('SP firma:',e));
+      .then(()=>toast('☁️ Firma sincronizzata su SP','suc',5000))
+      .catch(e=>{
+        console.error('SP firma error:',e);
+        toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
+      });
+  } else {
+    toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
   }
 }
 
@@ -4208,16 +4214,20 @@ async function spGetTecListId(){
       ],list:{template:'genericList'}})
     });
     const d2=await r2.json();
+    if(!d2.id) throw new Error('Creazione lista fallita: '+JSON.stringify(d2).substring(0,100));
     spTecListId=d2.id;
     db.config._spTecListId=spTecListId;
     saveDB();
     return spTecListId;
-  }catch(e){console.warn('spGetTecListId error',e);return null;}
+  }catch(e){console.error('spGetTecListId error',e);throw e;}
 }
 
 // Carica firma tecnico da SP (chiamata al login/sync)
 async function spLoadFirmaTecnico(){
-  if(!m365Token||!db.config.email) return;
+  if(!m365Token||!db.config.email){
+    if(m365Token&&!db.config.email) console.warn('spLoadFirmaTecnico: email non configurata');
+    return;
+  }
   const sid=await spGetSiteId();
   const tok=await m365GetToken();
   const listId=await spGetTecListId();
@@ -4243,11 +4253,15 @@ async function spLoadFirmaTecnico(){
 
 // Salva firma tecnico su SP
 async function spSalvaFirmaTecnico(firmaB64){
-  if(!m365Token||!db.config.email||!firmaB64) return;
+  if(!m365Token) throw new Error('Nessun token M365');
+  if(!db.config.email) throw new Error('Email tecnico non configurata in Config');
+  if(!firmaB64) throw new Error('Firma vuota');
   const sid=await spGetSiteId();
   const tok=await m365GetToken();
   const listId=await spGetTecListId();
-  if(!listId||!tok) return;
+  if(!listId) throw new Error('Lista AnymaTecnici non trovata/creata su SP');
+  if(!tok) throw new Error('Token SP non disponibile');
+  console.log('spSalvaFirmaTecnico: listId=',listId,'email=',db.config.email);
   try{
     const email=db.config.email;
     // Cerca item esistente
