@@ -946,7 +946,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v99';
+const APP_VERSION='v100';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3773,71 +3773,6 @@ async function spLoadTipi(){
 // ══════════════════════════════════════
 
 // Carica lista AnymaContratti da SP
-async function spLoadContratti(){
-  if(!m365Token) return;
-  const sid=await spGetSiteId();
-  const tok=await m365GetToken();
-  if(!tok) return;
-  const listName=db.config.spListContratti||'AnymaContratti';
-  // Trova ID lista
-  let listId=db.config._spContrListId;
-  if(!listId){
-    try{
-      const r=await fetch(`${GRAPH}/sites/${sid}/lists?$filter=displayName eq '${listName}'`,
-        {headers:{Authorization:`Bearer ${tok}`}});
-      const d=await r.json();
-      listId=d.value?.[0]?.id;
-      if(listId){db.config._spContrListId=listId;saveDB();}
-    }catch(e){return;}
-  }
-  if(!listId) return;
-  try{
-    const r=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=500`,
-      {headers:{Authorization:`Bearer ${tok}`}});
-    const d=await r.json();
-    db.contratti=(d.value||[]).map(item=>{
-      const f=item.fields;
-      return {
-        id:       item.id,
-        cliente:  f.Title||f.Cliente||'',
-        pacchetto:f.Pacchetto||'Spot',
-        saldo:    parseInt(f.SaldoMinuti||0),
-        numContr: f.NumContratto||'',
-        note:     f.Note||'',
-        _spId:    item.id,
-      };
-    });
-    saveDB();
-  }catch(e){console.warn('spLoadContratti error',e);}
-}
-
-// Aggiorna saldo contratto su SP dopo intervento telefonica
-async function spAggiornaSaldo(cliente, minutiScalati){
-  if(!m365Token) return;
-  const contr=db.contratti.find(c=>c.cliente===cliente);
-  if(!contr||!contr._spId) return;
-  if(contr.pacchetto==='Spot'||contr.pacchetto==='Unlimited') return; // nessun saldo
-  const nuovoSaldo=Math.max(0, contr.saldo - minutiScalati);
-  const sid=await spGetSiteId();
-  const tok=await m365GetToken();
-  const listId=db.config._spContrListId;
-  if(!listId||!tok) return;
-  try{
-    await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${contr._spId}/fields`,{
-      method:'PATCH',
-      headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
-      body:JSON.stringify({SaldoMinuti:nuovoSaldo})
-    });
-    contr.saldo=nuovoSaldo;
-    saveDB();
-  }catch(e){console.warn('spAggiornaSaldo error',e);}
-}
-
-// Ottieni contratto di un cliente
-function getContratto(nomeCliente){
-  return db.contratti.find(c=>c.cliente===nomeCliente)||{pacchetto:'Spot',saldo:0};
-}
-
 // Calcola minuti arrotondati in base al pacchetto
 function arrotondaMinuti(durataMn, pacchetto){
   if(pacchetto==='Pack4h') return Math.ceil(durataMn/5)*5;   // 5 min successivi
