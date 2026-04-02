@@ -948,7 +948,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v94';
+const APP_VERSION='v96';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1488,12 +1488,12 @@ function delChiamata(i){
 
 function updChiamata(i,f,v){
   telChiamate[i][f]=v;
+  // Ricalcola durata DOPO aver aggiornato il campo
+  const dur=calcDurataMin(telChiamate[i].inizio,telChiamate[i].fine);
+  telChiamate[i].durata=dur;
   aggiornaTotaliTel();
-  // Aggiorna solo la riga i senza re-render completo
   const durEl=document.getElementById(`telDur_${i}`);
-  const arrEl=document.getElementById(`telArr_${i}`);
-  if(durEl) durEl.textContent=telChiamate[i].durata+' min';
-  if(arrEl) arrEl.textContent=telChiamate[i].arrotondamento+' min';
+  if(durEl) durEl.textContent=dur+' min';
 }
 
 function renderChiamate(){
@@ -2024,7 +2024,12 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
         <b>${l==='IT'?'Tecnico':'Technician'}:</b> ${rt.tecnici||''}
       </div>
       <div class="pdf-box">
-        <b>${rt.cliente}</b>
+        ${(()=>{
+          const cliObj=db.clienti.find(c=>c.nome===rt.cliente)||{};
+          const rawAddr=cliObj.indirizzo||rt.clienteAddr||'';
+          const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA \${cliObj.piva}`:'')).trim();
+          return `<b>\${rt.cliente}</b><br>\${addrLines}`;
+        })()}
       </div>
     </div>
     <div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
@@ -2785,7 +2790,7 @@ function openSkedaCli(id){
         ${c.email?`<div><div class="fl">Email</div><div style="color:var(--tx)">${c.email}</div></div>`:''}
         ${c.tel?`<div><div class="fl">Telefono</div><div style="color:var(--tx)">${c.tel}</div></div>`:''}
         ${c.indirizzo||c.localita||c.comune?`<div><div class="fl">Indirizzo</div><div style="color:var(--tx);white-space:pre-line">${c.indirizzo||[c.comune,c.localita].filter(Boolean).join(', ')}</div></div>`:''}
-        ${c.pacchetto?`<div><div class="fl">Pacchetto telefonica</div><div style="color:#22d3ee;font-weight:700">${c.pacchetto}</div></div>`:''}
+        ${(()=>{const contr=getContratto(c.nome);const pac=c.pacchetto||contr?.pacchetto||'';return pac?`<div><div class="fl">Pacchetto telefonica</div><div style="color:#22d3ee;font-weight:700">${pac}</div></div>`:''})()}
         ${c.piva?`<div><div class="fl">P.IVA / C.F.</div><div style="color:var(--tx)">${c.piva}</div></div>`:''}
         ${c.sito?`<div><div class="fl">Sito web</div><a href="${c.sito}" target="_blank" style="color:var(--cr2)">${c.sito}</a></div>`:''}
         ${c.referente?`<div><div class="fl">Referente ANYMA</div><div style="color:var(--tx)">${c.referente}</div></div>`:''}
@@ -2805,16 +2810,18 @@ function openSkedaCli(id){
 
 function editCliOvl(id){
   const c=db.clienti.find(x=>x.id==id);if(!c)return;
-  document.getElementById('ovlSkedaCli').remove();
-  document.getElementById('nNome').value=c.nome||'';
-  document.getElementById('nEmail').value=c.email||'';
-  document.getElementById('nAddr').value=c.indirizzo||'';
-  document.getElementById('nLocalita').value=c.localita||'';
-  document.getElementById('nTel').value=c.tel||'';
-  const nPac=document.getElementById('nPacchetto');if(nPac)nPac.value=c.pacchetto||'';
-  // Cambia il salva per update
+  const sked=document.getElementById('ovlSkedaCli');if(sked)sked.remove();
   window._editCliId=id;
-  document.getElementById('ovlCli').classList.add('on');
+  // setTimeout evita che il click si propaghi e chiuda subito ovlCli
+  setTimeout(()=>{
+    document.getElementById('nNome').value=c.nome||'';
+    document.getElementById('nEmail').value=c.email||'';
+    document.getElementById('nAddr').value=c.indirizzo||'';
+    const nLoc=document.getElementById('nLocalita');if(nLoc)nLoc.value=c.localita||'';
+    document.getElementById('nTel').value=c.tel||'';
+    const nPac=document.getElementById('nPacchetto');if(nPac)nPac.value=c.pacchetto||'';
+    document.getElementById('ovlCli').classList.add('on');
+  },50);
 }
 function openAddCli(){['nNome','nEmail','nAddr','nLocalita','nTel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('ovlCli').classList.add('on');}
 function closeOvl(){document.getElementById('ovlCli').classList.remove('on');}
