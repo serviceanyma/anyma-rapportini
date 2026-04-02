@@ -1000,7 +1000,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v121';
+const APP_VERSION='v122';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3876,6 +3876,30 @@ function spItemToRT(item){
   try{ if(f.ChiamateJSON) chiamate=JSON.parse(f.ChiamateJSON); }catch(e){}
   let sessioni=[];
   try{ if(f.SessioniJSON) sessioni=JSON.parse(f.SessioniJSON); }catch(e){}
+
+  const tipo=f.Tipo0||f.Tipo||'';
+  const tipoServizio=f.TipoServizio||'Standard';
+  const isTelFon=tipo==='Assistenza Telefonica'||tipoServizio==='Telefonica';
+  const isTelAss=tipo==='Teleassistenza';
+
+  // Ore da SessioniJSON (Teleassistenza): somma durate sessioni in minuti → ore
+  const oreDA=isTelAss&&sessioni.length
+    ? parseFloat((sessioni.reduce((s,x)=>s+(x.durata||calcDurataMin(x.inizio,x.fine)),0)/60).toFixed(2))
+    : 0;
+
+  // Minuti usati Telefonica da MinutiUsati SP
+  const minTel=isTelFon?parseInt(f.MinutiUsati||0):0;
+
+  // Ore loco: da GiornateJSON o OreLavoro (solo RT non-TA e non-Tel)
+  const oreLoco=(!isTelFon&&!isTelAss)
+    ? giornate.reduce((s,g)=>s+parseFloat(g.oreLav||0),0)
+    : 0;
+
+  // ta_oreUsate: usa oreDA se disponibile, altrimenti OreLavoro (campo numerico SP)
+  const ta_oreUsate=isTelAss
+    ? (oreDA||parseFloat(f.OreLavoro||0))
+    : 0;
+
   return {
     id:           'sp_'+item.id,
     _spId:        item.id,
@@ -3885,7 +3909,7 @@ function spItemToRT(item){
     clienteEmail: f.EmailCliente||'',
     referente:    f.RefNome||'',
     tecnici:      f.Tecnici||'',
-    tipo:         f.Tipo0||f.Tipo||'',
+    tipo,
     stato:        f.Stato||'Bozza',
     lang:         f.Lang||'IT',
     attivita:     f.AttivitaIT||'',
@@ -3898,19 +3922,22 @@ function spItemToRT(item){
     firmaTec:     '',
     firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
-    _spOreLavoro: f.OreLavoro,  // debug
     // Telefonica
-    tipoServizio: f.TipoServizio||'Standard',
+    tipoServizio,
     pacchetto:    f.Pacchetto||'',
-    minutiUsati:  parseInt(f.MinutiUsati||0),
+    minutiUsati:  minTel,
     saldoPrima:   parseInt(f.SaldoPrima||0),
     saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
     sessioni,
     ta_data:      f.DataIntervento?.split('T')[0]||'',
     ta_minutiUsati:parseInt(f.MinutiUsati||0),
-    ta_oreUsate:  parseFloat(f.SaldoPrima||0)-parseFloat(f.SaldoDopo||0)||0,
+    ta_oreUsate,
     ta_saldoDopo: f.SaldoDopo!=null?parseFloat(f.SaldoDopo):null,
+    // Ore per dashboard
+    _oreTA:       ta_oreUsate,
+    _oreLoco:     oreLoco,
+    _minTel:      minTel,
   };
 }
 
@@ -4753,22 +4780,23 @@ function renderDash(){
   const totRt=list.length;
   const isTeleassRT=r=>r.tipo==='Teleassistenza';
   const isTelFonRT=r=>r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
-  // Ore Teleassistenza: da giornate o da ta_oreUsate
-  const totOreTeleass=list.filter(isTeleassRT).reduce((s,r)=>{
-    const fromGio=(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),0);
-    const fromTA=parseFloat(r.ta_oreUsate||0);
-    return s+(fromGio||fromTA);
-  },0);
-  // Ore in loco: solo RT che non sono Teleassistenza né Telefonica
-  const totOreInLoco=list.filter(r=>!isTeleassRT(r)&&!isTelFonRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
+
+  // Helper: ore effettive per tipo
+  const getOreTA=r=>r._oreTA!=null?r._oreTA:(r.ta_oreUsate||
+    (r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0));
+  const getOreLoco=r=>r._oreLoco!=null?r._oreLoco:
+    (r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
+  const getMinTel=r=>r._minTel!=null?r._minTel:(r.minutiUsati||0);
+
+  const totOreTeleass=list.filter(isTeleassRT).reduce((s,r)=>s+getOreTA(r),0);
+  const totOreInLoco=list.filter(r=>!isTeleassRT(r)&&!isTelFonRT(r)).reduce((s,r)=>s+getOreLoco(r),0);
   const totOre=totOreInLoco+totOreTeleass; // totale ancora usato altrove
-  const totViag=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreViag||0),s),0);
-  const totKm=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseInt(g.km||0),s),0);
+  const totViag=list.filter(r=>!isTelFonRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreViag||0),s),0);
+  const totKm=list.filter(r=>!isTelFonRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseInt(g.km||0),s),0);
   const inviati=list.filter(r=>r.stato==='Inviato'||r.stato==='Firmato').length;
   const clientiUnici=[...new Set(list.map(r=>r.cliente))].length;
-  // isTelFonRT già definito sopra — alias per compatibilità
   const isTelRT=isTelFonRT;
-  const totMinTel=list.filter(isTelRT).reduce((s,r)=>s+(r.minutiUsati||0),0);
+  const totMinTel=list.filter(isTelRT).reduce((s,r)=>s+getMinTel(r),0);
 
   document.getElementById('dashKPI').innerHTML=`
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
@@ -4812,11 +4840,13 @@ function renderDash(){
     if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,oreLoco:0,km:0,viag:0,oreTeleass:0,minTel:0,inviati:0};
     byClient[r.cliente].rt++;
     if(isTelFon){
-      byClient[r.cliente].minTel+=(r.minutiUsati||0);
+      byClient[r.cliente].minTel+=getMinTel(r);
     } else if(isTelAs){
-      (r.giornate||[]).forEach(g=>{byClient[r.cliente].oreTeleass+=parseFloat(g.oreLav||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
+      byClient[r.cliente].oreTeleass+=getOreTA(r);
+      (r.giornate||[]).forEach(g=>{byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
     } else {
-      (r.giornate||[]).forEach(g=>{byClient[r.cliente].oreLoco+=parseFloat(g.oreLav||0);byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
+      byClient[r.cliente].oreLoco+=getOreLoco(r);
+      (r.giornate||[]).forEach(g=>{byClient[r.cliente].km+=parseInt(g.km||0);byClient[r.cliente].viag+=parseFloat(g.oreViag||0);});
     }
     if(r.stato==='Inviato'||r.stato==='Firmato') byClient[r.cliente].inviati++;
   });
