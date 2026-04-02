@@ -992,7 +992,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v109';
+const APP_VERSION='v112';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2184,7 +2184,6 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
       <td class="tdl">${dataSess}</td>
       <td>${c.inizio||'—'}</td>
       <td>${dur} min</td>
-      <td style="color:#1e40af;font-size:8pt">—</td>
       <td class="tdl">${c.referente||'—'}</td>
     </tr>`;
   }).join('');
@@ -2229,15 +2228,13 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
       <thead><tr>
         <th class="thl">${l==='IT'?'Data':'Date'}</th>
         <th>${l==='IT'?'Inizio':'Start'}</th>
-        <th>${l==='IT'?'Effettivi':'Effective'}</th>
-        <th>${l==='IT'?'Arrotondati':'Rounded'}</th>
+        <th>${l==='IT'?'Durata':'Duration'}</th>
         <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td class="tdl" colspan="2"><b>${L.tot}</b></td>
-        <td><b>${totDur} min</b></td>
-        <td style="color:#1e40af"><b>${totArr} min</b></td>
+        <td><b>${totDur} min → ${totArr} min ${l==='IT'?'(arrotondati)':'(rounded)'}</b></td>
         <td></td>
       </tr></tfoot>
     </table>
@@ -2757,7 +2754,10 @@ async function salva(invia){
       const idx=db.rapportini.findIndex(r=>r.id===cRT.id);
       if(idx>=0) db.rapportini[idx]=cRT;
       saveDB();
-      toast('⚠️ SP: '+e.message+' — salvato offline','err');
+      const errMsg='⚠️ '+e.message;
+      toast(errMsg,'err',12000);
+      // Mostra dialog con errore completo
+      setTimeout(()=>{if(confirm('Errore SP:\n'+e.message+'\n\nVuoi provare a creare/aggiornare le colonne mancanti?')){spEnsureColumnsManual();}},300);
     }finally{
       if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Salva';}
       if(sendBtn) sendBtn.disabled=false;
@@ -3244,7 +3244,7 @@ function resetDati(){if(!confirm('Reset completo?'))return;db.rapportini=[];db.n
 // ══════════════════════════════════════
 // TOAST
 // ══════════════════════════════════════
-function toast(msg,type='suc'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast on '+type;clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),3200);}
+function toast(msg,type='suc',ms=3200){const el=document.getElementById('toast');el.textContent=msg;el.className='toast on '+type;clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),ms);}
 
 // ══════════════════════════════════════
 // PRELIMINARY TOGGLE (on firma screen)
@@ -3873,7 +3873,7 @@ async function spSaveRapportino(rt){
     });
     if(!r.ok){
       const e=await r.json().catch(()=>({}));
-      throw new Error(`PATCH ${r.status}: ${e?.error?.message||JSON.stringify(e)}`);
+      console.error("SP PATCH error",r.status,JSON.stringify(e)); throw new Error(`SP ${r.status}: ${e?.error?.message||e?.error?.code||JSON.stringify(e).substring(0,120)}`);
     }
     return {_spId:rt._spId};
   }else{
