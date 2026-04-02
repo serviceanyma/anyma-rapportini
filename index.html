@@ -408,7 +408,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
       <div class="ttags" id="ttags"></div>
     </div>
     <div class="fg"><label class="fl">Tipo Intervento *</label>
-      <select class="fc" id="inTipo"><option value="">— Seleziona tipo —</option></select>
+      <select class="fc" id="inTipo" onchange="onTipoChange(this.value)"><option value="">— Seleziona tipo —</option></select>
     </div>
   </div>
   <div class="wnav">
@@ -421,18 +421,67 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 <!-- STEP 2 GIORNATE + ATTIVITÀ -->
 <div class="scr" id="scrGio">
   <div class="steps"><div class="stp dn"></div><div class="stp act"></div><div class="stp"></div><div class="stp"></div></div>
-  <div class="stl">2 — Giornate intervento</div>
-  <div id="gioList"></div>
-  <button class="btn bgh bfl bsm" onclick="addG()" style="margin-bottom:8px">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Aggiungi giornata
-  </button>
-  <div class="totbar" style="margin-bottom:14px">
-    <div><div class="tv" id="totO">0.0</div><div class="tl">Ore Lav.</div></div>
-    <div><div class="tv" id="totV">0.0</div><div class="tl">Ore Viag.</div></div>
-    <div><div class="tv" id="totK">0</div><div class="tl">KM</div></div>
-    <div><div class="tv" id="totP">0</div><div class="tl">Pranzi ✓</div></div>
-    <div><div class="tv" id="totC">0</div><div class="tl">Cene ✓</div></div>
+  <div class="stl" id="gioTitle">2 — Giornate intervento</div>
+
+  <!-- SEZIONE STANDARD (nascosta per Telefonica) -->
+  <div id="gioStd">
+    <div id="gioList"></div>
+    <button class="btn bgh bfl bsm" onclick="addG()" style="margin-bottom:8px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Aggiungi giornata
+    </button>
+    <div class="totbar" style="margin-bottom:14px">
+      <div><div class="tv" id="totO">0.0</div><div class="tl">Ore Lav.</div></div>
+      <div><div class="tv" id="totV">0.0</div><div class="tl">Ore Viag.</div></div>
+      <div><div class="tv" id="totK">0</div><div class="tl">KM</div></div>
+      <div><div class="tv" id="totP">0</div><div class="tl">Pranzi ✓</div></div>
+      <div><div class="tv" id="totC">0</div><div class="tl">Cene ✓</div></div>
+    </div>
+  </div>
+
+  <!-- SEZIONE TELEFONICA (nascosta per Standard) -->
+  <div id="gioTel" style="display:none">
+    <!-- Info pacchetto -->
+    <div class="card" id="telPacchettoInfo" style="margin-bottom:10px;border-left:3px solid #06b6d4">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Pacchetto</div>
+          <div id="telPacchetto" style="font-size:16px;font-weight:700;color:#22d3ee">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Saldo disponibile</div>
+          <div id="telSaldo" style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">—</div>
+        </div>
+      </div>
+    </div>
+    <!-- Data sessione -->
+    <div class="fg" style="margin-bottom:10px">
+      <label class="fl">Data sessione</label>
+      <input type="date" class="fc" id="telData" onchange="cRT.chiamate_data=this.value">
+    </div>
+    <!-- Lista chiamate -->
+    <div id="telChiamateList"></div>
+    <button class="btn bgh bfl bsm" onclick="addChiamata()" style="margin-bottom:10px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Aggiungi chiamata
+    </button>
+    <!-- Totali sessione -->
+    <div class="card" style="margin-bottom:10px;background:var(--s2)">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)" id="telTotMin">0</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. effettivi</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee" id="telTotArr">0</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. fatturati</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--ok)" id="telSaldoDopo">—</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Saldo dopo</div>
+        </div>
+      </div>
+    </div>
   </div>
   <!-- ATTIVITÀ SVOLTE — sotto le giornate -->
   <div class="stl">Attività svolte</div>
@@ -853,6 +902,7 @@ const TIPO_MAP={
   'Installazione':'Installation',
   'Collaudo':'Commissioning',
   'Teleassistenza':'Remote Assistance',
+  'Assistenza Telefonica':'Phone Support',
   'Formazione':'Training'
 };
 function translateTipo(tipo,lang){
@@ -865,23 +915,24 @@ function translateTipo(tipo,lang){
 let db={
   clienti:[],
   tecnici:['Daniel Consolaro','Nelvio Rigon'],
-  tipi:['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Formazione'],
+  tipi:['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Assistenza Telefonica','Formazione'],
   rapportini:[],
   config:{
     azienda:'',email:'',firmaSalvata:'',
     // M365
     tenantId:'',clientId:'',
     // SharePoint
-    spSite:'',spList:'Email',spListClienti:'Clienti',spColNome:'Title',spColEmail:'Email',
+    spSite:'',spList:'Email',spListClienti:'Clienti',spListContratti:'AnymaContratti',spColNome:'Title',spColEmail:'Email',
     spEmails:[], // cached from SharePoint [{nome,email}]
     // OneDrive
     odFolder:'/Rapportini'
   },
-  nextRT:1
+  nextRT:1,
+  contratti:[]  // cache AnymaContratti da SP
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
-const APP_VERSION='v87';
+const APP_VERSION='v89';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;});
 
 
@@ -1209,7 +1260,7 @@ function nuovoRT(){
   // Preselect only the logged-in user
   selTec=m365User?.displayName?[m365User.displayName]:[];
   gio=[makeG()];fotos=[];fSt={tec:false,cli:false};usaSalvata=false;
-  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString()};
+  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:''};
   populateDDs();
   document.getElementById('inRT').value=cRT.numRT;
   document.getElementById('inAtt').value='';
@@ -1240,7 +1291,7 @@ function goStep(s){
     cRT.clienteTel=document.getElementById('inTel').value;
     cRT.tecnici=selTec.join(', ');cRT.tipo=tp;cRT.lang=lang;cRT.isPrelim=isPr;
     document.getElementById('inAtt').value=cRT.attivita||'';
-    renderGio();showScr('scrGio');
+    renderGio();showScr('scrGio');switchGioMode();
   }else if(s===1){
     // Back to Dati
     populateDDs();document.getElementById('inRT').value=cRT.numRT;
@@ -1253,13 +1304,25 @@ function goStep(s){
     isPr=cRT.isPrelim||false;safeTogglePr(isPr);
     showScr('scrDati');
   }else if(s===3){
-    // Giornate → Anteprima (FOTO DISABILITATA)
+    // Giornate/Sessione → Anteprima
     cRT.attivita=document.getElementById('inAtt').value;
-    const errs=valAll();
-    if(errs.length){errs.slice(0,2).forEach((e,i)=>setTimeout(()=>toast('⚠️ '+e,'err'),i*1700));return;}
-    cRT.giornate=[...gio];
-    checkAutoPreliminare();
-    cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
+    if(isTelefonica()){
+      // Salva chiamate e data sessione
+      if(!telChiamate.length){toast('⚠️ Aggiungi almeno una chiamata','err');return;}
+      const dataTel=document.getElementById('telData')?.value||today();
+      cRT.chiamate_data=dataTel;
+      cRT.chiamate=telChiamate.map(c=>({...c}));
+      // Simula giornata per compatibilità SP (1 giornata con ore lavoro = minuti/60)
+      const totArr=cRT.minutiUsati||0;
+      cRT.giornate=[{data:dataTel,lavDa:'',lavA:'',oreLav:parseFloat((totArr/60).toFixed(2)),oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}];
+      cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
+    } else {
+      const errs=valAll();
+      if(errs.length){errs.slice(0,2).forEach((e,i)=>setTimeout(()=>toast('⚠️ '+e,'err'),i*1700));return;}
+      cRT.giornate=[...gio];
+      checkAutoPreliminare();
+      cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
+    }
   }else if(s===4){
     // Back da Anteprima → Giornate (era Foto→Anteprima)
     cRT.attivita=document.getElementById('inAtt').value;
@@ -1295,6 +1358,167 @@ function salvaBozza(){
 // ══════════════════════════════════════
 // GIORNATE — accordion
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+// ASSISTENZA TELEFONICA — UI e logica
+// ══════════════════════════════════════
+
+// Verifica se il RT corrente è Telefonica
+const isTelefonica=()=>cRT&&cRT.tipo==='Assistenza Telefonica';
+
+// Chiamate correnti (array locale durante editing)
+let telChiamate=[];
+
+// Inizializza sezione telefonica quando si entra nello step giornate
+function initTelefonica(){
+  const contr=getContratto(cRT.cliente);
+  cRT.pacchetto=contr.pacchetto;
+  cRT.saldoPrima=contr.saldo;
+  cRT.tipoServizio='Telefonica';
+  // Ripristina chiamate esistenti o inizia con array vuoto
+  telChiamate=(cRT.chiamate||[]).slice();
+  // Data sessione: oggi o data già impostata
+  const dataEl=document.getElementById('telData');
+  if(dataEl) dataEl.value=cRT.chiamate_data||today();
+  cRT.chiamate_data=cRT.chiamate_data||today();
+  // Mostra info pacchetto
+  aggiornaTelInfo();
+  renderChiamate();
+}
+
+function aggiornaTelInfo(){
+  const contr=getContratto(cRT.cliente);
+  const pacEl=document.getElementById('telPacchetto');
+  const saldoEl=document.getElementById('telSaldo');
+  if(pacEl) pacEl.textContent=contr.pacchetto||'Spot';
+  if(saldoEl){
+    if(contr.pacchetto==='Spot'||contr.pacchetto==='Unlimited') saldoEl.textContent='N/A';
+    else saldoEl.textContent=contr.saldo+' min';
+  }
+  aggiornaTotaliTel();
+}
+
+function aggiornaTotaliTel(){
+  const contr=getContratto(cRT.cliente);
+  const pac=contr.pacchetto||'Spot';
+  let totMin=0,totArr=0;
+  telChiamate.forEach(c=>{
+    const dur=calcDurataMin(c.inizio,c.fine);
+    const arr=arrotondaMinuti(dur,pac);
+    c.durata=dur;
+    c.arrotondamento=arr;
+    totMin+=dur;
+    totArr+=arr;
+  });
+  cRT.minutiUsati=totArr;
+  // Saldo dopo
+  let saldoDopo=null;
+  if(pac!=='Spot'&&pac!=='Unlimited'){
+    saldoDopo=Math.max(0,(contr.saldo||0)-totArr);
+    cRT.saldoDopo=saldoDopo;
+  }
+  const elMin=document.getElementById('telTotMin');
+  const elArr=document.getElementById('telTotArr');
+  const elDopo=document.getElementById('telSaldoDopo');
+  if(elMin) elMin.textContent=totMin;
+  if(elArr) elArr.textContent=totArr;
+  if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo+' min':'N/A';
+}
+
+function calcDurataMin(inizio,fine){
+  if(!inizio||!fine) return 0;
+  const [h1,m1]=inizio.split(':').map(Number);
+  const [h2,m2]=fine.split(':').map(Number);
+  const tot=(h2*60+m2)-(h1*60+m1);
+  return Math.max(0,tot);
+}
+
+function makeChiamata(){
+  return {inizio:'',fine:'',referente:'',durata:0,arrotondamento:0};
+}
+
+function addChiamata(){
+  telChiamate.push(makeChiamata());
+  renderChiamate();
+}
+
+function delChiamata(i){
+  telChiamate.splice(i,1);
+  renderChiamate();
+}
+
+function updChiamata(i,f,v){
+  telChiamate[i][f]=v;
+  aggiornaTotaliTel();
+  // Aggiorna solo la riga i senza re-render completo
+  const durEl=document.getElementById(`telDur_${i}`);
+  const arrEl=document.getElementById(`telArr_${i}`);
+  if(durEl) durEl.textContent=telChiamate[i].durata+' min';
+  if(arrEl) arrEl.textContent=telChiamate[i].arrotondamento+' min';
+}
+
+function renderChiamate(){
+  const el=document.getElementById('telChiamateList');
+  if(!el) return;
+  if(!telChiamate.length){
+    el.innerHTML=`<div style="color:var(--tx3);font-size:13px;text-align:center;padding:16px">Nessuna chiamata — premi Aggiungi</div>`;
+    aggiornaTotaliTel();
+    return;
+  }
+  const contr=getContratto(cRT.cliente);
+  const pac=contr.pacchetto||'Spot';
+  el.innerHTML=telChiamate.map((c,i)=>{
+    const dur=calcDurataMin(c.inizio,c.fine);
+    const arr=arrotondaMinuti(dur,pac);
+    c.durata=dur; c.arrotondamento=arr;
+    return `<div class="gc" style="margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">📞 Chiamata ${i+1}</span>
+        <button class="delbtn" onclick="delChiamata(${i})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="fr c2" style="margin-bottom:8px">
+        <div class="fg" style="margin:0">
+          <label class="fl">Inizio</label>
+          ${tSel(c.inizio,`updChiamata(${i},'inizio',this.value);updChiamata(${i},'fine',this.value||'')`,'')}
+        </div>
+        <div class="fg" style="margin:0">
+          <label class="fl">Fine</label>
+          ${tSel(c.fine,`updChiamata(${i},'fine',this.value)`)}
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label class="fl">Referente cliente</label>
+        <input type="text" class="fc" value="${c.referente||''}" placeholder="Nome cognome" onchange="updChiamata(${i},'referente',this.value)">
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)">
+        <span>⏱ Effettivi: <b id="telDur_${i}" style="color:var(--tx)">${dur} min</b></span>
+        <span>📋 Fatturati: <b id="telArr_${i}" style="color:#22d3ee">${arr} min</b></span>
+      </div>
+    </div>`;
+  }).join('');
+  aggiornaTotaliTel();
+}
+
+// Toggle UI standard ↔ telefonica nello step giornate
+function switchGioMode(){
+  const isTel=isTelefonica();
+  const stdEl=document.getElementById('gioStd');
+  const telEl=document.getElementById('gioTel');
+  const titleEl=document.getElementById('gioTitle');
+  if(stdEl) stdEl.style.display=isTel?'none':'block';
+  if(telEl) telEl.style.display=isTel?'block':'none';
+  if(titleEl) titleEl.textContent=isTel?'2 — Sessione Telefonica':'2 — Giornate intervento';
+  if(isTel) initTelefonica();
+}
+
+// Quando si cambia il tipo intervento in scrDati, aggiorna la label del bottone avanti
+function onTipoChange(val){
+  cRT.tipo=val;
+  const btnAvanti=document.querySelector('#scrDati .btn.bp');
+  if(btnAvanti) btnAvanti.textContent=val==='Assistenza Telefonica'?'Avanti — Sessione ›':'Avanti — Giornate ›';
+}
+
 function renderGio(){
   document.getElementById('gioList').innerHTML=gio.map((g,i)=>{
     const ol=g.oreLav||0;
@@ -1697,7 +1921,108 @@ function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL();retur
 // ══════════════════════════════════════
 // BUILD PDF HTML (A4 794px wide)
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+// PDF ASSISTENZA TELEFONICA
+// ══════════════════════════════════════
+function buildPDFTelefonica(rt,fT,fC,prelim,l){
+  const L=T[l]||T.EN;
+  const chiamate=rt.chiamate||[];
+  const pac=rt.pacchetto||'Spot';
+  const dataSess=rt.chiamate_data||'';
+  const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
+  const logoB64=LOGO_PDF;
+  const saldoPrima=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoPrima||0);
+  const saldoDopo=(pac==='Spot'||pac==='Unlimited')?null:(rt.saldoDopo||0);
+
+  // Tabella chiamate
+  let saldoCorrente=saldoPrima;
+  const rows=chiamate.map((c,i)=>{
+    const dur=c.durata||calcDurataMin(c.inizio,c.fine);
+    const arr=c.arrotondamento||arrotondaMinuti(dur,pac);
+    let saldoCell='N/A';
+    if(saldoCorrente!==null){
+      saldoCorrente=Math.max(0,saldoCorrente-arr);
+      saldoCell=saldoCorrente+' min';
+    }
+    return `<tr>
+      <td class="tdl">${dataSess}</td>
+      <td>${c.inizio||'—'}</td>
+      <td>${c.fine||'—'}</td>
+      <td><b>${dur}</b></td>
+      <td style="color:#1e40af">${arr}</td>
+      <td class="tdl">${c.referente||'—'}</td>
+      <td style="color:#047857">${saldoCell}</td>
+    </tr>`;
+  }).join('');
+
+  const totDur=chiamate.reduce((s,c)=>s+(c.durata||0),0);
+  const totArr=chiamate.reduce((s,c)=>s+(c.arrotondamento||0),0);
+
+  // Firme
+  const sigTec=fT?`<img src="${fT}" style="max-width:180px;height:auto;display:block;margin:0 auto 4px">`:'<div class="pdf-sig-empty"></div>';
+  const sigCli=fC?`<img src="${fC}" style="max-width:180px;height:auto;display:block;margin:0 auto 4px">`:'<div class="pdf-sig-empty"></div>';
+
+  return `<div class="pdf-page">
+    ${wm}
+    <div class="pdf-hdr">
+      <img class="pdf-logo-img" src="${logoB64}">
+      <div class="pdf-company">
+        <strong>ANYMA SRL</strong>
+        Via Val di Sole 31 - 36010 - Zanè (VI) - Italy<br>
+        Tel. +39 0445 223889 - info@anymapack.it<br>
+        P.IVA IT04494860242 - C.F. & R.I. Vicenza 04494860242<br>
+        REA: VI - 408350 - Cap. Soc. Euro 10.000<br>
+        SDI: 5RUO82D - anyma.srl@legalmail.it
+      </div>
+    </div>
+    <div class="pdf-boxes">
+      <div class="pdf-box">
+        <b>${l==='IT'?'Rapportino':'Report'} ID:</b> ${rt.numRT}<br>
+        <b>${l==='IT'?'Data':'Date'}:</b> ${new Date(rt.dataCreazione).toLocaleDateString('it-IT')}<br>
+        <b>${l==='IT'?'Tipo Intervento':'Type'}:</b> ${rt.tipo}<br>
+        <b>${l==='IT'?'Tecnico':'Technician'}:</b> ${rt.tecnici||''}
+      </div>
+      <div class="pdf-box">
+        <b>${rt.cliente}</b><br>
+        <b>${l==='IT'?'Pacchetto':'Package'}:</b> ${pac}<br>
+        <b>${l==='IT'?'Saldo prima':'Balance before'}:</b> ${saldoPrima!==null?saldoPrima+' min':'N/A'}<br>
+        <b>${l==='IT'?'Saldo dopo':'Balance after'}:</b> ${saldoDopo!==null?saldoDopo+' min':'N/A'}
+      </div>
+    </div>
+    <div class="pdf-sec">${l==='IT'?'SESSIONE TELEFONICA:':'PHONE SESSION:'}</div>
+    <table class="pdf-tbl">
+      <thead><tr>
+        <th class="thl">${l==='IT'?'Data':'Date'}</th>
+        <th>${l==='IT'?'Inizio':'Start'}</th>
+        <th>${l==='IT'?'Fine':'End'}</th>
+        <th>${l==='IT'?'Durata':'Duration'}</th>
+        <th>${l==='IT'?'Fatturati':'Billed'}</th>
+        <th class="thl">${l==='IT'?'Referente':'Contact'}</th>
+        <th>${l==='IT'?'Saldo residuo':'Balance'}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td class="tdl" colspan="3"><b>TOTALI</b></td>
+        <td><b>${totDur} min</b></td>
+        <td><b>${totArr} min</b></td>
+        <td></td>
+        <td><b>${saldoDopo!==null?saldoDopo+' min':'N/A'}</b></td>
+      </tr></tfoot>
+    </table>
+    <div class="pdf-sec">${l==='IT'?'ATTIVITÀ SVOLTE:':'WORK PERFORMED:'}</div>
+    <div class="pdf-wp">${(rt.attivita||'').replace(/\n/g,'<br>')}</div>
+    <div class="pdf-sigs">
+      <div class="pdf-sig">${sigTec}<div class="pdf-sig-line">${l==='IT'?'Firma Tecnico':'Technician Signature'}</div></div>
+      <div class="pdf-sig">${sigCli}<div class="pdf-sig-line">${l==='IT'?'Firma Cliente':'Client Signature'}</div></div>
+    </div>
+  </div>`;
+}
+
 function buildPDFHTML(rt,gd,fT,fC,prelim,l){
+  // Branch Telefonica
+  if(rt.tipoServizio==='Telefonica'||(rt.tipo==='Assistenza Telefonica'&&rt.chiamate?.length)){
+    return buildPDFTelefonica(rt,fT,fC,prelim,l);
+  }
   const L=T[l]||T.EN;
   const totO=gd.reduce((s,g)=>s+(parseFloat(g.oreLav)||0),0);
   const totV=gd.reduce((s,g)=>s+(parseFloat(g.oreViag)||0),0);
@@ -2143,6 +2468,11 @@ async function salva(invia){
     }catch(e){console.warn('PDF upload error',e);}
   }
 
+  // Se Telefonica: aggiorna saldo contratto su SP
+  if(isTelefonica()&&cRT.minutiUsati>0){
+    spAggiornaSaldo(cRT.cliente, cRT.minutiUsati).catch(e=>console.warn('saldo update:',e));
+  }
+
   if(invia){
     const toList=getAllSelectedEmails().filter(Boolean)||[emailDest].filter(Boolean);
     setTimeout(()=>inviaEmailRT(cRT,toList),500);
@@ -2353,6 +2683,8 @@ function openDet(id){
 function modRT(){
   isMod=true;cRT={...cDet};
   gio=cRT.giornate?cRT.giornate.map(g=>({...g})):[makeG()];
+  // Ripristina chiamate telefonica
+  telChiamate=(cRT.chiamate||[]).map(c=>({...c}));
   fotos=[];fSt={tec:!!cRT.firmaTec,cli:!!cRT.firmaCli};
   lang=cRT.lang||'EN';isPr=cRT.isPrelim||false;
   selTec=cRT.tecnici?cRT.tecnici.split(', ').filter(Boolean):[];
@@ -2959,6 +3291,12 @@ const SP_SCHEMA = [
   {n:'Archiviato',    t:'boolean', d:'Archiviato'},
   {n:'PDFUrl',        t:'text',    d:'PDF URL'},
   {n:'NumFoto',       t:'number',  d:'Numero Foto'},
+  {n:'TipoServizio',  t:'text',    d:'Tipo Servizio'},       // Standard / Telefonica
+  {n:'Pacchetto',     t:'text',    d:'Pacchetto'},            // Spot/Pack4h/Pack15h/Illimitato
+  {n:'MinutiUsati',   t:'number',  d:'Minuti Usati'},
+  {n:'SaldoPrima',    t:'number',  d:'Saldo Prima'},
+  {n:'SaldoDopo',     t:'number',  d:'Saldo Dopo'},
+  {n:'ChiamateJSON',  t:'note',    d:'Chiamate JSON'},
 ];
 
 let spSiteId = null;
@@ -3070,6 +3408,9 @@ function spItemToRT(item){
       pranzo:false,cena:false,pernotto:false
     }];
   }
+  // Chiamate telefonica
+  let chiamate=[];
+  try{ if(f.ChiamateJSON) chiamate=JSON.parse(f.ChiamateJSON); }catch(e){}
   return {
     id:           'sp_'+item.id,
     _spId:        item.id,
@@ -3079,7 +3420,7 @@ function spItemToRT(item){
     clienteEmail: f.EmailCliente||'',
     referente:    f.RefNome||'',
     tecnici:      f.Tecnici||'',
-    tipo:         f.Tipo0||f.Tipo||'',        // SP usa Tipo0
+    tipo:         f.Tipo0||f.Tipo||'',
     stato:        f.Stato||'Bozza',
     lang:         f.Lang||'IT',
     attivita:     f.AttivitaIT||'',
@@ -3092,6 +3433,13 @@ function spItemToRT(item){
     firmaTec:     '',
     firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
+    // Telefonica
+    tipoServizio: f.TipoServizio||'Standard',
+    pacchetto:    f.Pacchetto||'',
+    minutiUsati:  parseInt(f.MinutiUsati||0),
+    saldoPrima:   parseInt(f.SaldoPrima||0),
+    saldoDopo:    parseInt(f.SaldoDopo||0),
+    chiamate,
   };
 }
 
@@ -3123,6 +3471,13 @@ function rtToSPFields(rt){
     Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
     NumFoto:        rt.fotoCount||0,
+    // Telefonica
+    TipoServizio:   rt.tipoServizio||'Standard',
+    Pacchetto:      rt.pacchetto||'',
+    MinutiUsati:    rt.minutiUsati||0,
+    SaldoPrima:     rt.saldoPrima||0,
+    SaldoDopo:      rt.saldoDopo||0,
+    ChiamateJSON:   JSON.stringify(rt.chiamate||[]),
   };
 }
 
@@ -3193,6 +3548,83 @@ async function spDeleteRapportino(spId){
       method:'DELETE',headers:{Authorization:`Bearer ${tok}`}
     });
   }catch(e){console.error('SP delete error',e);}
+}
+
+// ══════════════════════════════════════
+// ANYMA CONTRATTI — gestione pacchetti telefonica
+// ══════════════════════════════════════
+
+// Carica lista AnymaContratti da SP
+async function spLoadContratti(){
+  if(!m365Token) return;
+  const sid=await spGetSiteId();
+  const tok=await m365GetToken();
+  if(!tok) return;
+  const listName=db.config.spListContratti||'AnymaContratti';
+  // Trova ID lista
+  let listId=db.config._spContrListId;
+  if(!listId){
+    try{
+      const r=await fetch(`${GRAPH}/sites/${sid}/lists?$filter=displayName eq '${listName}'`,
+        {headers:{Authorization:`Bearer ${tok}`}});
+      const d=await r.json();
+      listId=d.value?.[0]?.id;
+      if(listId){db.config._spContrListId=listId;saveDB();}
+    }catch(e){return;}
+  }
+  if(!listId) return;
+  try{
+    const r=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=500`,
+      {headers:{Authorization:`Bearer ${tok}`}});
+    const d=await r.json();
+    db.contratti=(d.value||[]).map(item=>{
+      const f=item.fields;
+      return {
+        id:       item.id,
+        cliente:  f.Title||f.Cliente||'',
+        pacchetto:f.Pacchetto||'Spot',
+        saldo:    parseInt(f.SaldoMinuti||0),
+        numContr: f.NumContratto||'',
+        note:     f.Note||'',
+        _spId:    item.id,
+      };
+    });
+    saveDB();
+  }catch(e){console.warn('spLoadContratti error',e);}
+}
+
+// Aggiorna saldo contratto su SP dopo intervento telefonica
+async function spAggiornaSaldo(cliente, minutiScalati){
+  if(!m365Token) return;
+  const contr=db.contratti.find(c=>c.cliente===cliente);
+  if(!contr||!contr._spId) return;
+  if(contr.pacchetto==='Spot'||contr.pacchetto==='Unlimited') return; // nessun saldo
+  const nuovoSaldo=Math.max(0, contr.saldo - minutiScalati);
+  const sid=await spGetSiteId();
+  const tok=await m365GetToken();
+  const listId=db.config._spContrListId;
+  if(!listId||!tok) return;
+  try{
+    await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${contr._spId}/fields`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+      body:JSON.stringify({SaldoMinuti:nuovoSaldo})
+    });
+    contr.saldo=nuovoSaldo;
+    saveDB();
+  }catch(e){console.warn('spAggiornaSaldo error',e);}
+}
+
+// Ottieni contratto di un cliente
+function getContratto(nomeCliente){
+  return db.contratti.find(c=>c.cliente===nomeCliente)||{pacchetto:'Spot',saldo:0};
+}
+
+// Calcola minuti arrotondati in base al pacchetto
+function arrotondaMinuti(durataMn, pacchetto){
+  if(pacchetto==='Pack4h') return Math.ceil(durataMn/5)*5;   // 5 min successivi
+  if(pacchetto==='Pack15h') return Math.ceil(durataMn);       // 1 min successivo
+  return durataMn; // Spot e Illimitato: nessun arrotondamento standard
 }
 
 // ── Carica silenzioso (per autoSync) ──
@@ -3911,7 +4343,7 @@ async function autoSyncOnLogin(){
 
     // 4. Sync Email e Clienti in parallelo
     setBar('Sincronizzazione...','var(--warn)');
-    await Promise.allSettled([syncSPEmails(),spSyncClienti()]);
+    await Promise.allSettled([syncSPEmails(),spSyncClienti(),spLoadContratti()]);
 
     // 5. Done
     setBar(`SharePoint — ${nRT} rapportini · ${db.clienti.length} clienti`,'var(--ok)');
