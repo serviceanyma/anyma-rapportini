@@ -992,7 +992,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v106';
+const APP_VERSION='v108';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1541,12 +1541,8 @@ function delChiamata(i){
 }
 
 function updChiamata(i,f,v){
-  telChiamate[i][f]=v;
-  // Ricalcola durata DOPO aver aggiornato il campo
-  const dur=calcDurataMin(telChiamate[i].inizio,telChiamate[i].fine);
-  telChiamate[i].durata=dur;
+  telChiamate[i][f]=f==='durata'?parseInt(v)||0:v;
   aggiornaTotaliTel();
-
 }
 
 function renderChiamate(){
@@ -2179,11 +2175,11 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
   const saldoDopo=(pac==='Spot'||pac==='Premium')?null:(rt.saldoDopo||0);
 
   // Tabella chiamate — arrotondamento sul TOTALE
-  const totDur=chiamate.reduce((s,c)=>s+(c.durata||calcDurataMin(c.inizio,c.fine)),0);
+  const totDur=chiamate.reduce((s,c)=>s+parseInt(c.durata||0),0);
   const totArr=arrotondaUnita(totDur,'Telefonica',pac);
   const saldoDopoCalc=(saldoPrima!==null)?Math.max(0,saldoPrima-totArr):null;
   const rows=chiamate.map((c,i)=>{
-    const dur=c.durata||calcDurataMin(c.inizio,c.fine);
+    const dur=parseInt(c.durata||0);
     return `<tr>
       <td class="tdl">${dataSess}</td>
       <td>${c.inizio||'—'}</td>
