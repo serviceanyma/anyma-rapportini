@@ -188,6 +188,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 
 /* OVERLAY */
 .ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;align-items:flex-end}
+#ovlCli{align-items:center;justify-content:center;z-index:9991}
 .ovl.on{display:flex}
 .modal{background:var(--s1);border-radius:14px 14px 0 0;padding:18px;width:100%;max-height:85vh;overflow-y:auto;border-top:2px solid var(--cr)}
 .mh{width:38px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 13px}
@@ -846,10 +847,15 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 </nav>
 
 <!-- OVERLAY CLIENTE -->
-<div class="ovl" id="ovlCli">
-  <div class="modal">
-    <div class="mh"></div>
-    <div class="stl">Aggiungi cliente</div>
+<div class="ovl" id="ovlCli" onclick="if(event.target===this)closeOvl()">
+  <div class="modal" id="ovlCliModal" style="border-radius:14px;max-height:80vh;overflow-y:auto;width:calc(100% - 32px);max-width:440px;margin:auto;position:relative">
+    <!-- Header con X sempre visibile -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="stl" style="margin:0">Aggiungi / Modifica cliente</div>
+      <button class="btn bgh bic bsm" onclick="closeOvl()" style="min-width:36px;min-height:36px;border-radius:50%">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
     <div class="fg"><label class="fl">Nome *</label><input type="text" class="fc" id="nNome"></div>
     <div class="fg"><label class="fl">Email *</label><input type="email" class="fc" id="nEmail"></div>
     <div class="fg"><label class="fl">Indirizzo</label><textarea class="fc" id="nAddr" style="min-height:65px" placeholder="Via, numero&#10;CAP Città&#10;Paese"></textarea></div>
@@ -863,7 +869,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         <option value="Unlimited">Unlimited</option>
       </select>
     </div>
-    <div style="display:flex;gap:9px;margin-top:5px">
+    <div style="display:flex;gap:9px;margin-top:14px;padding-bottom:4px">
       <button class="btn bgh" style="flex:1" onclick="closeOvl()">Annulla</button>
       <button class="btn bp" style="flex:1" onclick="salvaCli()">Salva</button>
     </div>
@@ -948,7 +954,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v96';
+const APP_VERSION='v97';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
