@@ -780,6 +780,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         <button class="btn bgh bsm" onclick="spEnsureColumnsManual()">+ Colonne</button>
         <button class="btn bgh bsm" style="color:var(--warn)" onclick="spResetCache()" title="Reset cache IDs SP">↺ Reset</button>
         <button class="btn bgh bsm" style="color:var(--cr)" onclick="spIspezioniSP()" title="Ispeziona SP">🔍</button>
+        <button class="btn bgh bsm" style="color:#22d3ee" onclick="spPopolaContratti()" title="Crea contratti Spot per tutti i clienti SP">📋 Contratti</button>
       </div>
     </div>
     <div id="spStatusRT" style="font-size:11px"></div>
@@ -992,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v113';
+const APP_VERSION='v114';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3942,6 +3943,77 @@ function arrotondaMinuti(durataMn, pacchetto){
   // Mappa vecchi nomi → nuovi
   const p=pacchetto==='Pack4h'?'Base':pacchetto==='Pack15h'?'Standard':pacchetto;
   return arrotondaUnita(durataMn,'Telefonica',p);
+}
+
+// Popola AnymaContratti con tutti i clienti da SP (tutti Spot)
+async function spPopolaContratti(){
+  if(!m365Token){toast('Accedi prima con Microsoft','wrn');return;}
+  toast('⏳ Lettura clienti da SP...','wrn');
+  try{
+    const sid=await spGetSiteId();
+    const tok=await m365GetToken();
+
+    // 1. Leggi clienti da lista Clienti SP
+    const listName=db.config.spListClienti||'Clienti';
+    const listsR=await graphGet(`/sites/${sid}/lists?$filter=displayName eq '${listName}'`);
+    if(!listsR.value?.length) throw new Error(`Lista "${listName}" non trovata`);
+    const cliListId=listsR.value[0].id;
+    const cliData=await graphGet(`/sites/${sid}/lists/${cliListId}/items?$expand=fields&$top=500`);
+    const colNome=db.config.spColNome||'Title';
+    const nomiClienti=(cliData.value||[])
+      .map(item=>item.fields?.[colNome]||item.fields?.Title||'')
+      .filter(Boolean);
+
+    if(!nomiClienti.length) throw new Error('Nessun cliente trovato nella lista SP');
+    toast(`⏳ ${nomiClienti.length} clienti trovati — creazione contratti...`,'wrn');
+
+    // 2. Ottieni ID lista AnymaContratti
+    const contrListId=await (async()=>{
+      if(db.config._spContrListId) return db.config._spContrListId;
+      const r=await graphGet(`/sites/${sid}/lists?$filter=displayName eq 'AnymaContratti'`);
+      const id=r.value?.[0]?.id;
+      if(!id) throw new Error('Lista AnymaContratti non trovata su SP');
+      db.config._spContrListId=id; saveDB();
+      return id;
+    })();
+
+    // 3. Leggi contratti già esistenti per evitare duplicati
+    const esistenti=await graphGet(`/sites/${sid}/lists/${contrListId}/items?$expand=fields&$top=500`);
+    const esistentiSet=new Set(
+      (esistenti.value||[]).map(i=>`${i.fields?.Title||''}|${i.fields?.TipoContratto||''}`)
+    );
+
+    // 4. Crea 3 contratti per ogni cliente (solo se non esistono già)
+    const tipi=['Telefonica','Teleassistenza','Manutenzione'];
+    let creati=0, saltati=0;
+    for(const nome of nomiClienti){
+      for(const tipo of tipi){
+        const key=`${nome}|${tipo}`;
+        if(esistentiSet.has(key)){saltati++;continue;}
+        await fetch(`${GRAPH}/sites/${sid}/lists/${contrListId}/items`,{
+          method:'POST',
+          headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+          body:JSON.stringify({fields:{
+            Title:nome,
+            TipoContratto:tipo,
+            Pacchetto:'Spot',
+            SaldoMinuti:0,
+            SaldoOre:0,
+            Attivo:true,
+            Note:'Creato automaticamente'
+          }})
+        });
+        creati++;
+      }
+    }
+
+    // 5. Ricarica db.contratti
+    await spLoadContratti();
+    toast(`✓ ${creati} contratti creati, ${saltati} già esistenti`,'suc',6000);
+  }catch(e){
+    toast('⚠️ '+e.message,'err',8000);
+    console.error('spPopolaContratti error',e);
+  }
 }
 
 // Ottieni contratto attivo per cliente+tipo
