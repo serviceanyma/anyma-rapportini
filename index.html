@@ -857,12 +857,8 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
-    <div class="stl" style="margin-bottom:10px">RT per tipo intervento</div>
-    <canvas id="chartTipo" height="80"></canvas>
-  </div>
-  <div class="card" style="margin-bottom:10px">
-    <div class="stl" style="margin-bottom:10px">Ore per cliente (in loco)</div>
-    <canvas id="chartCliOre" height="160"></canvas>
+    <div class="stl" style="margin-bottom:10px">Ore per cliente</div>
+    <canvas id="chartCliOre" height="80"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Andamento mensile RT</div>
@@ -997,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v127';
+const APP_VERSION='v128';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -4917,22 +4913,7 @@ function renderDashCharts(list){
   // Palette colori
   const PAL=['#8B1A1A','#2ecc71','#06b6d4','#a78bfa','#f59e0b','#ef4444','#3b82f6','#10b981'];
 
-  // ── 1. RT per tipo intervento (doughnut) ──
-  destroyChart('tipo');
-  const byTipo={};
-  list.forEach(r=>{const t=r.tipo||'—';byTipo[t]=(byTipo[t]||0)+1;});
-  const tipoLabels=Object.keys(byTipo);
-  const tipoData=tipoLabels.map(t=>byTipo[t]);
-  const ctxT=document.getElementById('chartTipo');
-  if(ctxT&&tipoLabels.length){
-    _charts['tipo']=new Chart(ctxT,{
-      type:'doughnut',
-      data:{labels:tipoLabels,datasets:[{data:tipoData,backgroundColor:PAL.slice(0,tipoLabels.length),borderWidth:0}]},
-      options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#aaa',font:{size:11},boxWidth:12}}}}
-    });
-  }else if(ctxT){ctxT.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
-
-  // ── 2. Ore per cliente: 3 barre (Telefonica/Teleassistenza/Manutenzione) ──
+  // ── Ore per cliente: 3 barre (Telefonica/Teleassistenza/Manutenzione) ──
   destroyChart('cliore');
   // Colori categoria: arancione=Tel, ciano=TA, verde=Manutenzione
   const C_TEL='#f59e0b'; const C_TA='#06b6d4'; const C_MAN='#2ecc71';
