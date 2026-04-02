@@ -1000,7 +1000,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v120';
+const APP_VERSION='v121';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3898,6 +3898,7 @@ function spItemToRT(item){
     firmaTec:     '',
     firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
+    _spOreLavoro: f.OreLavoro,  // debug
     // Telefonica
     tipoServizio: f.TipoServizio||'Standard',
     pacchetto:    f.Pacchetto||'',
@@ -4694,7 +4695,12 @@ async function dashSyncSP(){
     const n=await spLoadRapportini();
     initDash();
     renderHome();
-    toast(`✓ ${n} rapportini caricati da SP`,'suc',4000);
+    // Diagnostica: mostra cosa è arrivato
+    const rts=db.rapportini;
+    const totOre=rts.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),ss),0);
+    console.log('RT caricati:',rts.length,'Ore totali:',totOre);
+    rts.forEach(r=>console.log(r.numRT,'tipo:',r.tipo,'giornate:',r.giornate?.length,'oreLav:',r.giornate?.[0]?.oreLav,'OreLavoro SP:',r._spOreLavoro));
+    toast(`✓ ${n} rapportini da SP — ${totOre.toFixed(1)}h totali`,'suc',5000);
   }catch(e){
     toast('⚠️ Errore sync SP: '+e.message,'err',6000);
     console.error('dashSyncSP:',e);
@@ -4746,14 +4752,22 @@ function renderDash(){
   // ── KPI ──
   const totRt=list.length;
   const isTeleassRT=r=>r.tipo==='Teleassistenza';
-  const totOreTeleass=list.filter(isTeleassRT).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
-  const totOreInLoco=list.filter(r=>!isTeleassRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
+  const isTelFonRT=r=>r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+  // Ore Teleassistenza: da giornate o da ta_oreUsate
+  const totOreTeleass=list.filter(isTeleassRT).reduce((s,r)=>{
+    const fromGio=(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),0);
+    const fromTA=parseFloat(r.ta_oreUsate||0);
+    return s+(fromGio||fromTA);
+  },0);
+  // Ore in loco: solo RT che non sono Teleassistenza né Telefonica
+  const totOreInLoco=list.filter(r=>!isTeleassRT(r)&&!isTelFonRT(r)).reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreLav||0),s),0);
   const totOre=totOreInLoco+totOreTeleass; // totale ancora usato altrove
   const totViag=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseFloat(g.oreViag||0),s),0);
   const totKm=list.reduce((s,r)=>(r.giornate||[]).reduce((ss,g)=>ss+parseInt(g.km||0),s),0);
   const inviati=list.filter(r=>r.stato==='Inviato'||r.stato==='Firmato').length;
   const clientiUnici=[...new Set(list.map(r=>r.cliente))].length;
-  const isTelRT=r=>r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+  // isTelFonRT già definito sopra — alias per compatibilità
+  const isTelRT=isTelFonRT;
   const totMinTel=list.filter(isTelRT).reduce((s,r)=>s+(r.minutiUsati||0),0);
 
   document.getElementById('dashKPI').innerHTML=`
@@ -4794,7 +4808,7 @@ function renderDash(){
   const byClient={};
   list.forEach(r=>{
     const isTelAs=r.tipo==='Teleassistenza';
-    const isTelFon=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+    const isTelFon=isTelFonRT(r);
     if(!byClient[r.cliente]) byClient[r.cliente]={nome:r.cliente,rt:0,oreLoco:0,km:0,viag:0,oreTeleass:0,minTel:0,inviati:0};
     byClient[r.cliente].rt++;
     if(isTelFon){
