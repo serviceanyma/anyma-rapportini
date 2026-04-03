@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v135';
+const APP_VERSION='v136';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1236,7 +1236,7 @@ function renderHome(){
           <span class="bdg bdg-${r.stato.toLowerCase()}">${r.stato}</span>
         </div>
         <div style="display:flex;gap:11px;font-size:11px;color:var(--tx3)">
-          <span>📅 ${r.giornate?.length?r.giornate[0].data:'—'}</span>
+          <span>📅 ${r.dataIntervento||r.giornate?.[0]?.data||r.ta_data||r.chiamate_data||'—'}</span>
           ${(()=>{
             if(_isTF) return `<span>📞 ${tMin} min</span>`;
             if(_isTA) return `<span>💻 ${tO.toFixed(2)}h</span>`;
@@ -1366,7 +1366,7 @@ function nuovoRT(){
   // Preselect only the logged-in user
   selTec=m365User?.displayName?[m365User.displayName]:[];
   gio=[makeG()];fotos=[];fSt={tec:false,cli:false};usaSalvata=false;
-  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:'',sessioni:[],ta_data:'',ta_minutiUsati:0,ta_oreUsate:0,ta_saldoDopo:null};
+  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),dataIntervento:'',tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:'',sessioni:[],ta_data:'',ta_minutiUsati:0,ta_oreUsate:0,ta_saldoDopo:null};
   populateDDs();
   document.getElementById('inRT').value=cRT.numRT;
   document.getElementById('inAtt').value='';
@@ -2851,20 +2851,14 @@ async function salva(invia){
   cRT.stato=invia?'Inviato':(isPr?'Aperto':'Completato');
   cRT.lang=lang;
   cRT.isPrelim=isPr;
-  // ── Data intervento reale (non data creazione RT) ──
+  // ── Calcola dataIntervento (campo separato da dataCreazione) ──
   const _dataIntervento=(()=>{
     if(isTeleassistenza()) return cRT.ta_data||cRT.chiamate_data||'';
     if(isTelefonica())     return cRT.chiamate_data||cRT.ta_data||'';
     return cRT.giornate?.[0]?.data||'';
   })();
-  if(_dataIntervento){
-    // Aggiorna solo la data, mantieni l'ora originale
-    const _oraParte=(cRT.dataCreazione||'').split('T')[1]||'00:00:00.000Z';
-    cRT.dataCreazione=_dataIntervento+'T'+_oraParte;
-    // Sincronizza anche ta_data e chiamate_data
-    if(isTeleassistenza()) cRT.ta_data=_dataIntervento;
-    if(isTelefonica()) cRT.chiamate_data=_dataIntervento;
-  }
+  if(_dataIntervento) cRT.dataIntervento=_dataIntervento;
+  // dataCreazione rimane invariata (= data di creazione del rapportino)
 
   // ── Aggiorna array locale (cache) ──
   if(isMod){
@@ -3948,7 +3942,8 @@ function spItemToRT(item){
     attivitaEN:   f.AttivitaEN||'',
     isPrelim:     f.Preliminare===true||f.Preliminare==='true',
     _archiviato:  f.Archiviato===true||f.Archiviato==='true',
-    dataCreazione:f.DataIntervento||item.createdDateTime||new Date().toISOString(),
+    dataCreazione:  item.createdDateTime||new Date().toISOString(),
+    dataIntervento: f.DataIntervento?.split('T')[0]||'',
     giornate,
     fotoCount:    parseInt(f.NumFoto||0),
     firmaTec:     '',
@@ -3981,7 +3976,11 @@ function rtToSPFields(rt){
   const totViag =giornate.reduce((s,g)=>s+parseFloat(g.oreViag||0),0);
   const totKm   =giornate.reduce((s,g)=>s+parseInt(g.km||0),0);
   // DataIntervento: formato YYYY-MM-DD (SP accetta senza orario per campi Date)
-  const dataVal =giornate.length?giornate[0].data:new Date().toISOString().split('T')[0];
+  // Data intervento: usa dataIntervento esplicito, poi giornate, poi ta_data/chiamate_data
+  const dataVal = rt.dataIntervento
+    || (giornate.length?giornate[0].data:'')
+    || rt.ta_data||rt.chiamate_data
+    || new Date().toISOString().split('T')[0];
   return {
     Title:          rt.numRT||'',
     Cliente:        rt.cliente||'',
@@ -4807,7 +4806,8 @@ function getDashFiltered(){
   const anno=annoVal?parseInt(annoVal):new Date().getFullYear();
   const cli=document.getElementById('dashCli')?.value||'';
   return db.rapportini.filter(r=>{
-    const y=r.dataCreazione?new Date(r.dataCreazione).getFullYear():new Date().getFullYear();
+    const _dInt=r.dataIntervento||r.ta_data||r.chiamate_data||(r.giornate?.[0]?.data)||'';
+    const y=_dInt?new Date(_dInt).getFullYear():(r.dataCreazione?new Date(r.dataCreazione).getFullYear():new Date().getFullYear());
     if(anno&&y!==anno) return false;
     if(cli&&r.cliente!==cli) return false;
     return true;
