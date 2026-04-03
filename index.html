@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v134';
+const APP_VERSION='v135';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1398,6 +1398,11 @@ function goStep(s){
     cRT.tecnici=selTec.join(', ');cRT.tipo=tp;cRT.lang=lang;cRT.isPrelim=isPr;
     document.getElementById('inAtt').value=cRT.attivita||'';
     renderGio();showScr('scrGio');switchGioMode();
+    // Ripristina date salvate nei campi input
+    const _telD=document.getElementById('telData');
+    const _taD=document.getElementById('taData');
+    if(_telD&&cRT.chiamate_data) _telD.value=cRT.chiamate_data;
+    if(_taD&&cRT.ta_data) _taD.value=cRT.ta_data;
   }else if(s===1){
     // Back to Dati — salva chiamate prima di uscire
     if(isTelefonica()) cRT.chiamate=telChiamate.map(c=>({...c}));
@@ -2853,8 +2858,12 @@ async function salva(invia){
     return cRT.giornate?.[0]?.data||'';
   })();
   if(_dataIntervento){
-    // Mantieni l'ora originale ma sostituisci la data
-    cRT.dataCreazione=_dataIntervento+'T'+((cRT.dataCreazione||'').split('T')[1]||'00:00:00.000Z');
+    // Aggiorna solo la data, mantieni l'ora originale
+    const _oraParte=(cRT.dataCreazione||'').split('T')[1]||'00:00:00.000Z';
+    cRT.dataCreazione=_dataIntervento+'T'+_oraParte;
+    // Sincronizza anche ta_data e chiamate_data
+    if(isTeleassistenza()) cRT.ta_data=_dataIntervento;
+    if(isTelefonica()) cRT.chiamate_data=_dataIntervento;
   }
 
   // ── Aggiorna array locale (cache) ──
@@ -3953,7 +3962,8 @@ function spItemToRT(item){
     saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
     sessioni,
-    ta_data:      f.DataIntervento?.split('T')[0]||'',
+    chiamate_data: f.DataIntervento?.split('T')[0]||'',
+    ta_data:      f.DataIntervento?.split('T')[0]||f.DataIntervento||'',
     ta_minutiUsati:parseInt(f.MinutiUsati||0),
     ta_oreUsate,
     ta_saldoDopo: f.SaldoDopo!=null?parseFloat(f.SaldoDopo):null,
