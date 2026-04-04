@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v139';
+const APP_VERSION='v140';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3916,7 +3916,14 @@ function spItemToRT(item){
     }
   }catch(e){}
   let sessioni=[];
-  try{ if(f.SessioniJSON) sessioni=JSON.parse(f.SessioniJSON); }catch(e){}
+  try{
+    if(f.SessioniJSON){
+      const raw=JSON.parse(f.SessioniJSON);
+      // Nuovo formato: {pacchetto, oreAddebitare, oreEffettive, sessioni:[]}
+      // Vecchio formato: array puro
+      sessioni=Array.isArray(raw)?raw:(raw.sessioni||[]);
+    }
+  }catch(e){}
 
   const tipo=f.Tipo0||f.Tipo||'';
   const tipoServizio=f.TipoServizio||'Standard';
@@ -4032,7 +4039,12 @@ function rtToSPFields(rt){
       minutiEffettivi: rt.minutiEffettivi||0,
       chiamate:        rt.chiamate||[]
     }),
-    SessioniJSON:   JSON.stringify(rt.sessioni||[]),
+    SessioniJSON:   JSON.stringify({
+      pacchetto:      rt.pacchetto||'Spot',
+      oreAddebitare:  rt.ta_oreUsate||0,
+      oreEffettive:   rt.oreEffettive||0,
+      sessioni:       rt.sessioni||[]
+    }),
   };
 }
 
