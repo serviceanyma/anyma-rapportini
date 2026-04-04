@@ -477,7 +477,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         </div>
         <div>
           <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee" id="telTotArr">0</div>
-          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. fatturati</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Min. arrotondati</div>
         </div>
         <div>
           <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--ok)" id="telSaldoDopo">—</div>
@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v136';
+const APP_VERSION='v137';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1538,7 +1538,13 @@ function aggiornaTotaliTel(){
   const elArr=document.getElementById('telTotArr');
   const elDopo=document.getElementById('telSaldoDopo');
   if(elMin) elMin.textContent=totMin;
-  if(elArr) elArr.textContent=totArr;
+  if(elArr){
+    elArr.textContent=totArr;
+    // Se Spot/Premium: nessun arrotondamento — grayed out
+    elArr.style.opacity=(pac==='Spot'||pac==='Premium')?'0.4':'1';
+    const lbl=elArr.nextElementSibling;
+    if(lbl) lbl.textContent=(pac==='Spot'||pac==='Premium')?'Min. (no arrot.)':'Min. arrotondati';
+  }
   if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo+' min':'N/A';
 }
 
@@ -3781,7 +3787,9 @@ const SP_SCHEMA = [
   {n:'NumFoto',       t:'number',  d:'Numero Foto'},
   {n:'TipoServizio',  t:'text',    d:'Tipo Servizio'},       // Standard / Telefonica
   {n:'Pacchetto',     t:'text',    d:'Pacchetto'},            // Spot/Pack4h/Pack15h/Illimitato
-  {n:'MinutiUsati',   t:'number',  d:'Minuti Usati'},
+  {n:'MinutiUsati',    t:'number',  d:'Minuti Usati'},
+  {n:'MinutiEffettivi',t:'number',  d:'Minuti Effettivi'},
+  {n:'OreEffettive',   t:'number',  d:'Ore Effettive'},
   {n:'SaldoPrima',    t:'number',  d:'Saldo Prima'},
   {n:'SaldoDopo',     t:'number',  d:'Saldo Dopo'},
   {n:'ChiamateJSON',  t:'note',    d:'Chiamate JSON'},
@@ -3899,7 +3907,14 @@ function spItemToRT(item){
   }
   // Chiamate telefonica
   let chiamate=[];
-  try{ if(f.ChiamateJSON) chiamate=JSON.parse(f.ChiamateJSON); }catch(e){}
+  try{
+    if(f.ChiamateJSON){
+      const raw=JSON.parse(f.ChiamateJSON);
+      // Nuovo formato: oggetto con {pacchetto, minutiUsati, chiamate:[]}
+      // Vecchio formato: array puro
+      chiamate=Array.isArray(raw)?raw:(raw.chiamate||[]);
+    }
+  }catch(e){}
   let sessioni=[];
   try{ if(f.SessioniJSON) sessioni=JSON.parse(f.SessioniJSON); }catch(e){}
 
@@ -3952,7 +3967,9 @@ function spItemToRT(item){
     // Telefonica
     tipoServizio,
     pacchetto:    f.Pacchetto||'',
-    minutiUsati:  minTel,
+    minutiUsati:     minTel,
+    minutiEffettivi: parseInt(f.MinutiEffettivi||0),
+    oreEffettive:    parseFloat(f.OreEffettive||0),
     saldoPrima:   parseInt(f.SaldoPrima||0),
     saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
@@ -4004,10 +4021,17 @@ function rtToSPFields(rt){
     // Telefonica
     TipoServizio:   rt.tipoServizio||'Standard',
     Pacchetto:      rt.pacchetto||'',
-    MinutiUsati:    rt.minutiUsati||0,
+    MinutiUsati:     rt.minutiUsati||0,
+    MinutiEffettivi: rt.minutiEffettivi||0,
+    OreEffettive:    rt.oreEffettive||0,
     SaldoPrima:     rt.saldoPrima||0,
     SaldoDopo:      rt.saldoDopo||0,
-    ChiamateJSON:   JSON.stringify(rt.chiamate||[]),
+    ChiamateJSON:   JSON.stringify({
+      pacchetto:       rt.pacchetto||'Spot',
+      minutiUsati:     rt.minutiUsati||0,
+      minutiEffettivi: rt.minutiEffettivi||0,
+      chiamate:        rt.chiamate||[]
+    }),
     SessioniJSON:   JSON.stringify(rt.sessioni||[]),
   };
 }
