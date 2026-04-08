@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v140';
+const APP_VERSION='v141';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1039,6 +1039,29 @@ function tSelTA(inizio, val, onch){
     o+=`<option value="${v}"${v===val?' selected':''}>${v}</option>`;
   });
   return `<select class="fc"${''} onchange="${onch}">${o}</select>`;
+}
+
+// Selettore orario con 2 select affiancati: HH e MM (step 15)
+// onch riceve il valore combinato "HH:MM"
+function tSelHHMM(val, onch, style=''){
+  const hh=val?parseInt(val.split(':')[0])||0:0;
+  const mm=val?parseInt(val.split(':')[1])||0:0;
+  // Select ore 0-24
+  let oH='<option value="">—</option>';
+  for(let h=0;h<=24;h++){
+    const v=String(h).padStart(2,'0');
+    oH+=`<option value="${v}"${h===hh&&val?' selected':''}>${v}</option>`;
+  }
+  // Select minuti 00,15,30,45
+  let oM='';
+  [0,15,30,45].forEach(m=>{
+    const v=String(m).padStart(2,'0');
+    oM+=`<option value="${v}"${m===mm&&val?' selected':''}>${v}</option>`;
+  });
+  // onChange combina HH:MM e chiama onch
+  const cbH=`(function(el){var mm=el.parentElement.querySelector('.tsmm').value||'00';if(el.value){(function(v){${onch}})(el.value+':'+mm);}else{(function(v){${onch}})('');}})( this)`;
+  const cbM=`(function(el){var hh=el.parentElement.querySelector('.tshh').value;if(hh){(function(v){${onch}})(hh+':'+el.value);}})( this)`;
+  return `<div style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="${cbH}">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="${cbM}">${oM}</select></div>`;
 }
 
 function tSel(val,onch,style=''){
@@ -1774,11 +1797,11 @@ function renderSessioniTA(){
       <div class="fr c2" style="margin-bottom:8px">
         <div class="fg" style="margin:0">
           <label class="fl">Inizio</label>
-          ${tSel(s.inizio,`updSessioneTA(${i},'inizio',this.value)`)}
+          ${tSelHHMM(s.inizio,`updSessioneTA(${i},'inizio',this.value)`)}
         </div>
         <div class="fg" style="margin:0">
           <label class="fl">Fine</label>
-          ${tSelTA(s.inizio,s.fine,`updSessioneTA(${i},'fine',this.value)`)}
+          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`)}
         </div>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -1872,15 +1895,15 @@ function renderGio(){
         <!-- Viaggio Andata -->
         <div class="slbl">🚗 Viaggio Andata</div>
         <div class="fr c2" style="margin-bottom:10px">
-          <div class="fg" style="margin:0"><label class="fl">Partenza</label>${tSel(g.vAnDa,`updG(${i},'vAnDa',this.value);recalc(${i})`)}</div>
-          <div class="fg" style="margin:0"><label class="fl">Arrivo</label>${tSel(g.vAnA,`updG(${i},'vAnA',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Partenza</label>${tSelHHMM(g.vAnDa,`updG(${i},'vAnDa',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Arrivo</label>${tSelHHMM(g.vAnA,`updG(${i},'vAnA',this.value);recalc(${i})`)}</div>
         </div>
 
         <!-- Lavoro Inizio/Fine -->
         <div class="slbl">⏱ Lavoro</div>
         <div class="fr c2" style="margin-bottom:10px">
-          <div class="fg" style="margin:0"><label class="fl">Inizio</label>${tSel(g.lavDa,`updG(${i},'lavDa',this.value);recalc(${i})`)}</div>
-          <div class="fg" style="margin:0"><label class="fl">Fine</label>${tSel(g.lavA,`updG(${i},'lavA',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Inizio</label>${tSelHHMM(g.lavDa,`updG(${i},'lavDa',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Fine</label>${tSelHHMM(g.lavA,`updG(${i},'lavA',this.value);recalc(${i})`)}</div>
         </div>
 
         <!-- Pause -->
@@ -1902,8 +1925,8 @@ function renderGio(){
         <!-- Viaggio Ritorno -->
         <div class="slbl">🏠 Viaggio Ritorno</div>
         <div class="fr c2" style="margin-bottom:10px">
-          <div class="fg" style="margin:0"><label class="fl">Partenza</label>${tSel(g.vRetDa,`updG(${i},'vRetDa',this.value);recalc(${i})`)}</div>
-          <div class="fg" style="margin:0"><label class="fl">Arrivo</label>${tSel(g.vRetA,`updG(${i},'vRetA',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Partenza</label>${tSelHHMM(g.vRetDa,`updG(${i},'vRetDa',this.value);recalc(${i})`)}</div>
+          <div class="fg" style="margin:0"><label class="fl">Arrivo</label>${tSelHHMM(g.vRetA,`updG(${i},'vRetA',this.value);recalc(${i})`)}</div>
         </div>
 
         <!-- Errori overlap -->
