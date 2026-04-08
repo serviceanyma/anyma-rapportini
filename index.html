@@ -1006,7 +1006,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v145';
+const APP_VERSION='v146';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1119,13 +1119,21 @@ function tSel(val,onch,style=''){
 // ══════════════════════════════════════
 // AUTO-CALCULATE ORE LAVORO
 // ══════════════════════════════════════
+// Converte minuti → ore centesimali ESATTE (multipli di 0.25)
+function min2hCent(min){
+  // Mantieni i quarti esatti: 0→0, 15→0.25, 30→0.50, 45→0.75
+  const h=Math.floor(min/60);
+  const m=min%60;
+  const fraz=m/60; // 0, 0.25, 0.5, 0.75
+  return h+fraz;
+}
 function calcOreLav(g){
   let tot=0;
   if(g.lavDa&&g.lavA){const d=t2m(g.lavDa),a=t2m(g.lavA);if(a>d)tot+=a-d;}
   tot-=(g.pausaPranzo||0);
   tot-=(g.pausaCena||0);
   if(tot<0)tot=0;
-  return Math.round(tot/60*10)/10;
+  return min2hCent(tot);
 }
 
 // ══════════════════════════════════════
@@ -1135,7 +1143,7 @@ function calcOreViag(g){
   let tot=0;
   if(g.vAnDa&&g.vAnA){const d=t2m(g.vAnDa),a=t2m(g.vAnA);if(a>d)tot+=a-d;}
   if(g.vRetDa&&g.vRetA){const d=t2m(g.vRetDa),a=t2m(g.vRetA);if(a>d)tot+=a-d;}
-  return Math.round(tot/60*10)/10;
+  return min2hCent(tot);
 }
 
 // ══════════════════════════════════════
@@ -2124,8 +2132,9 @@ function recalc(i){
 }
 
 function updTot(){
-  document.getElementById('totO').textContent=gio.reduce((s,g)=>s+parseFloat(g.oreLav||0),0).toFixed(1);
-  document.getElementById('totV').textContent=gio.reduce((s,g)=>s+parseFloat(g.oreViag||0),0).toFixed(1);
+  const _dispOre=v=>Number.isInteger(v)?v+'.00':(v%0.25===0?v.toFixed(2):v.toFixed(2));
+  document.getElementById('totO').textContent=_dispOre(gio.reduce((s,g)=>s+parseFloat(g.oreLav||0),0));
+  document.getElementById('totV').textContent=_dispOre(gio.reduce((s,g)=>s+parseFloat(g.oreViag||0),0));
   document.getElementById('totK').textContent=gio.reduce((s,g)=>s+parseInt(g.km||0),0);
   document.getElementById('totP').textContent=gio.filter(g=>g.pranzo).length;
   document.getElementById('totC').textContent=gio.filter(g=>g.cena).length;
