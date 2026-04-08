@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v149';
+const APP_VERSION='v150';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1421,7 +1421,8 @@ function eliminaRT(id){
 // ══════════════════════════════════════
 const genRT=()=>{const d=new Date();return 'RT_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false});
+const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false,tipoIntervento:''});
+const TIPI_INTERVENTO=['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Assistenza Telefonica','Formazione'];
 
 function nuovoRT(){
   isMod=false;isPr=false;lang='IT';
@@ -2008,6 +2009,15 @@ function renderGio(){
             <input type="number" class="fc" value="${g.km||0}" min="0" onchange="updG(${i},'km',parseInt(this.value)||0);updTot()" style="text-align:center;background:transparent;border:none;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--warn);padding:0;width:100%">
             <div style="font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">KM</div>
           </div>
+        </div>
+
+        <!-- Tipo Intervento -->
+        <div class="fg" style="margin-bottom:10px">
+          <label class="fl">Tipo Intervento</label>
+          <select class="fc" onchange="updG(${i},'tipoIntervento',this.value)">
+            <option value="">— seleziona —</option>
+            ${TIPI_INTERVENTO.map(t=>`<option value="${t}"${g.tipoIntervento===t?' selected':''}>${t}</option>`).join('')}
+          </select>
         </div>
 
         <!-- Indennità -->
@@ -3854,14 +3864,12 @@ const SP_SCHEMA = [
   {n:'Preliminare',   t:'boolean', d:'Preliminare'},
   {n:'Archiviato',    t:'boolean', d:'Archiviato'},
   {n:'PDFUrl',        t:'text',    d:'PDF URL'},
-  {n:'NumFoto',       t:'number',  d:'Numero Foto'},
   {n:'TipoServizio',  t:'text',    d:'Tipo Servizio'},       // Standard / Telefonica
   {n:'Pacchetto',     t:'text',    d:'Pacchetto'},            // Spot/Pack4h/Pack15h/Illimitato
   {n:'MinutiUsati',    t:'number',  d:'Minuti Usati'},
   {n:'MinutiEffettivi',t:'number',  d:'Minuti Effettivi'},
   {n:'OreEffettive',   t:'number',  d:'Ore Effettive'},
   {n:'SaldoPrima',    t:'number',  d:'Saldo Prima'},
-  {n:'SaldoDopo',     t:'number',  d:'Saldo Dopo'},
   {n:'ChiamateJSON',  t:'note',    d:'Chiamate JSON'},
   {n:'SessioniJSON',  t:'note',    d:'Sessioni JSON'},
 ];
@@ -3986,12 +3994,13 @@ function spItemToRT(item){
     }
   }catch(e){}
   let sessioni=[];
+  let ta_oreUsateSP=0;
   try{
     if(f.SessioniJSON){
       const raw=JSON.parse(f.SessioniJSON);
-      // Nuovo formato: {pacchetto, oreAddebitare, oreEffettive, sessioni:[]}
-      // Vecchio formato: array puro
+      // Supporta: array puro (legacy), {sessioni:[], oreUsate} (nuovo), {sessioni:[], oreAddebitare} (vecchio)
       sessioni=Array.isArray(raw)?raw:(raw.sessioni||[]);
+      ta_oreUsateSP=parseFloat(raw.oreUsate??raw.oreAddebitare??0)||0;
     }
   }catch(e){}
 
@@ -4013,9 +4022,9 @@ function spItemToRT(item){
     ? giornate.reduce((s,g)=>s+parseFloat(g.oreLav||0),0)
     : 0;
 
-  // ta_oreUsate: usa oreDA se disponibile, altrimenti OreLavoro (campo numerico SP)
+  // ta_oreUsate: usa oreUsate/oreAddebitare dal wrapper SessioniJSON, poi calcolo da durate, poi OreLavoro SP
   const ta_oreUsate=isTelAss
-    ? (oreDA||parseFloat(f.OreLavoro||0))
+    ? (ta_oreUsateSP||oreDA||parseFloat(f.OreLavoro||0))
     : 0;
 
   return {
@@ -4037,7 +4046,7 @@ function spItemToRT(item){
     dataCreazione:  item.createdDateTime||new Date().toISOString(),
     dataIntervento: f.DataIntervento?.split('T')[0]||'',
     giornate,
-    fotoCount:    parseInt(f.NumFoto||0),
+    fotoCount:    0,  // NumFoto rimosso
     firmaTec:     '',
     firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
@@ -4048,14 +4057,14 @@ function spItemToRT(item){
     minutiEffettivi: parseInt(f.MinutiEffettivi||0),
     oreEffettive:    parseFloat(f.OreEffettive||0),
     saldoPrima:   parseInt(f.SaldoPrima||0),
-    saldoDopo:    parseInt(f.SaldoDopo||0),
+    saldoDopo:    0,  // gestito dal Portale
     chiamate,
     sessioni,
     chiamate_data: f.DataIntervento?.split('T')[0]||'',
     ta_data:      f.DataIntervento?.split('T')[0]||f.DataIntervento||'',
     ta_minutiUsati:parseInt(f.MinutiUsati||0),
     ta_oreUsate,
-    ta_saldoDopo: f.SaldoDopo!=null?parseFloat(f.SaldoDopo):null,
+    ta_saldoDopo: null, // gestito dal Portale
     // Ore per dashboard
     _oreTA:       ta_oreUsate,
     _oreLoco:     oreLoco,
@@ -4094,7 +4103,6 @@ function rtToSPFields(rt){
     Preliminare:    rt.isPrelim||false,
     Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
-    NumFoto:        rt.fotoCount||0,
     // Telefonica
     TipoServizio:   rt.tipoServizio||'Standard',
     Pacchetto:      rt.pacchetto||'',
@@ -4102,7 +4110,6 @@ function rtToSPFields(rt){
     MinutiEffettivi: rt.minutiEffettivi||0,
     OreEffettive:    rt.oreEffettive||0,
     SaldoPrima:     rt.saldoPrima||0,
-    SaldoDopo:      rt.saldoDopo||0,
     ChiamateJSON:   JSON.stringify({
       pacchetto:       rt.pacchetto||'Spot',
       minutiUsati:     rt.minutiUsati||0,
@@ -4111,7 +4118,7 @@ function rtToSPFields(rt){
     }),
     SessioniJSON:   JSON.stringify({
       pacchetto:      rt.pacchetto||'Spot',
-      oreAddebitare:  rt.ta_oreUsate||0,
+      oreUsate:       rt.ta_oreUsate||0,
       oreEffettive:   rt.oreEffettive||0,
       sessioni:       rt.sessioni||[]
     }),
