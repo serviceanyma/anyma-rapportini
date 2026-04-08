@@ -1065,7 +1065,22 @@ function _tsChange(el,isHH){
   const selH=wrap.querySelector('.tshh');
   const selM=wrap.querySelector('.tsmm');
   const hh=selH?.value||'';
-  const mm=selM?.value||'00';
+  let mm=selM?.value||'00';
+  // Se c'è un minVal e stiamo cambiando HH, aggiorna le opzioni MM disponibili
+  if(isHH && wrap.dataset.minVal){
+    const minTotMin=parseInt(wrap.dataset.minVal)||0;
+    const minHH=Math.floor(minTotMin/60);
+    const minMM=minTotMin%60;
+    const curHH=parseInt(hh)||0;
+    const mmStart=(curHH===minHH)?minMM:0;
+    const validMMs=[0,15,30,45].filter(m=>m>=mmStart);
+    const curMM=parseInt(mm)||0;
+    selM.innerHTML=validMMs.map(m=>{
+      const v=String(m).padStart(2,'0');
+      return `<option value="${v}"${m===curMM?' selected':''}>${v}</option>`;
+    }).join('');
+    if(!validMMs.includes(curMM)) mm=String(validMMs[0]||0).padStart(2,'0');
+  }
   const cbKey=wrap.dataset.cb;
   const fn=_tsCB[cbKey];
   if(!fn) return;
@@ -1073,26 +1088,40 @@ function _tsChange(el,isHH){
 }
 
 // Selettore orario con 2 select affiancati: HH e MM (step 15)
-function tSelHHMM(val, onch, style=''){
+// minVal: stringa "HH:MM" — se fornita, le opzioni partono da quell'orario +15min in avanti
+function tSelHHMM(val, onch, style='', minVal=''){
   const hh=val?parseInt(val.split(':')[0]):null;
   const mm=val?Math.round(parseInt(val.split(':')[1])/15)*15:0;
   const safeM=[0,15,30,45].includes(mm)?mm:0;
+  // Calcola minimo in minuti (inizio + 15min)
+  let minTotMin=0;
+  if(minVal){
+    const mhh=parseInt(minVal.split(':')[0])||0;
+    const mmm=Math.round((parseInt(minVal.split(':')[1])||0)/15)*15;
+    minTotMin=mhh*60+mmm+15;
+  }
+  const minHH=Math.floor(minTotMin/60);
+  const minMM=minTotMin%60;
   // Genera callback key univoca
   const key='ts'+(++_tsCBIdx);
   _tsCB[key]=new Function('v', onch.replace(/this\.value/g,'v'));
-  // Select ore 0-24
+  // Select ore: parte da minHH
   let oH='<option value="">—</option>';
-  for(let i=0;i<=24;i++){
+  for(let i=minHH;i<=24;i++){
     const v=String(i).padStart(2,'0');
     oH+=`<option value="${v}"${hh===i&&val!==''&&val!=null?' selected':''}>${v}</option>`;
   }
-  // Select minuti 00,15,30,45
+  // Select minuti: se HH corrente == minHH, parte da minMM
+  const curHH=hh!==null?hh:(minVal?minHH:0);
+  const mmStart=(minVal&&curHH===minHH)?minMM:0;
   let oM='';
-  [0,15,30,45].forEach(m=>{
+  [0,15,30,45].filter(m=>m>=mmStart).forEach(m=>{
     const v=String(m).padStart(2,'0');
     oM+=`<option value="${v}"${m===safeM&&val?' selected':''}>${v}</option>`;
   });
-  return `<div class="ts-wrap" data-cb="${key}" style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="_tsChange(this,true)">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="_tsChange(this,false)">${oM}</select></div>`;
+  if(!oM) oM='<option value="00">00</option>';
+  const minValAttr=minTotMin>0?` data-min-val="${minTotMin}"`:'';
+  return `<div class="ts-wrap" data-cb="${key}"${minValAttr} style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="_tsChange(this,true)">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="_tsChange(this,false)">${oM}</select></div>`;
 }
 
 function tSel(val,onch,style=''){
@@ -1422,7 +1451,6 @@ function eliminaRT(id){
 const genRT=()=>{const d=new Date();return 'RT_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false,tipoIntervento:''});
-const TIPI_INTERVENTO=['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Assistenza Telefonica','Formazione'];
 
 function nuovoRT(){
   isMod=false;isPr=false;lang='IT';
@@ -1842,7 +1870,7 @@ function renderSessioniTA(){
         </div>
         <div class="fg" style="margin:0">
           <label class="fl">Fine</label>
-          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`)}
+          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`,'',s.inizio||'')}
         </div>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -1896,7 +1924,7 @@ function initStd(){
   cRT.pacchetto=contr.pacchetto||'Spot';
   cRT.saldoPrima=contr.saldoOre||0;
   // Propaga pacchetto su tutte le giornate esistenti
-  gio.forEach(g=>{ if(!g.pacchetto) g.pacchetto=cRT.pacchetto; });
+  gio.forEach(g=>{ if(!g.pacchetto) g.pacchetto=cRT.pacchetto; g.tipoIntervento=cRT.tipo||''; });
 }
 
 // Quando si cambia il tipo intervento in scrDati, aggiorna la label del bottone avanti
@@ -2009,15 +2037,6 @@ function renderGio(){
             <input type="number" class="fc" value="${g.km||0}" min="0" onchange="updG(${i},'km',parseInt(this.value)||0);updTot()" style="text-align:center;background:transparent;border:none;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--warn);padding:0;width:100%">
             <div style="font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">KM</div>
           </div>
-        </div>
-
-        <!-- Tipo Intervento -->
-        <div class="fg" style="margin-bottom:10px">
-          <label class="fl">Tipo Intervento</label>
-          <select class="fc" onchange="updG(${i},'tipoIntervento',this.value)">
-            <option value="">— seleziona —</option>
-            ${TIPI_INTERVENTO.map(t=>`<option value="${t}"${g.tipoIntervento===t?' selected':''}>${t}</option>`).join('')}
-          </select>
         </div>
 
         <!-- Indennità -->
@@ -2171,6 +2190,7 @@ function addG(){
   }
   g._open=true;
   g.pacchetto=cRT.pacchetto||'';
+  g.tipoIntervento=cRT.tipo||'';
   gio.forEach(x=>x._open=false);
   gio.push(g);
   renderGio();
@@ -2582,6 +2602,15 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA ${cliObj.piva}`:'')).trim();
   const dateStr=rt.dataCreazione?new Date(rt.dataCreazione).toLocaleDateString('it-IT'):'';
   const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
+  // Box pacchetto pre-calcolato (evita template literal annidati con backtick)
+  const _pac=rt.pacchetto||'Spot';
+  const _saldoP=rt.saldoPrima||0;
+  const boxPacchetto=(_pac&&_pac!=='Spot')
+    ?'<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">'
+      +'<span><b>'+(l==='IT'?'Pacchetto':'Package')+':</b> '+_pac+'</span>'
+      +'<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_saldoP+' h</span>'
+      +'</div>'
+    :'';
 
   // Righe tabella: Inizio Lav / Fine Lav / P.Pranzo / P.Cena / Ore Tot / Pranzo / Cena / Pernotto / Ore Viag / KM
   const rows=gd.map(g=>{
@@ -2636,16 +2665,7 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
     </div>
 
     <!-- PACCHETTO (se non Spot) -->
-    \${(()=>{
-      const pac=rt.pacchetto||'Spot';
-      const saldoP=rt.saldoPrima||0;
-      const isSpot=!pac||pac==='Spot';
-      if(!isSpot) return \`<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
-        <span><b>\${l==='IT'?'Pacchetto':'Package'}:</b> \${pac}</span>
-        <span><b>\${l==='IT'?'Saldo iniziale':'Opening balance'}:</b> \${saldoP} h</span>
-      </div>\`;
-      return '';
-    })()}
+    ${boxPacchetto}
     <!-- TABELLA ORARIO -->
     <div class="pdf-sec">${L.wh}:</div>
     <table class="pdf-tbl">
@@ -3864,12 +3884,14 @@ const SP_SCHEMA = [
   {n:'Preliminare',   t:'boolean', d:'Preliminare'},
   {n:'Archiviato',    t:'boolean', d:'Archiviato'},
   {n:'PDFUrl',        t:'text',    d:'PDF URL'},
+  {n:'NumFoto',       t:'number',  d:'Numero Foto'},
   {n:'TipoServizio',  t:'text',    d:'Tipo Servizio'},       // Standard / Telefonica
   {n:'Pacchetto',     t:'text',    d:'Pacchetto'},            // Spot/Pack4h/Pack15h/Illimitato
   {n:'MinutiUsati',    t:'number',  d:'Minuti Usati'},
   {n:'MinutiEffettivi',t:'number',  d:'Minuti Effettivi'},
   {n:'OreEffettive',   t:'number',  d:'Ore Effettive'},
   {n:'SaldoPrima',    t:'number',  d:'Saldo Prima'},
+  {n:'SaldoDopo',     t:'number',  d:'Saldo Dopo'},
   {n:'ChiamateJSON',  t:'note',    d:'Chiamate JSON'},
   {n:'SessioniJSON',  t:'note',    d:'Sessioni JSON'},
 ];
@@ -4022,7 +4044,7 @@ function spItemToRT(item){
     ? giornate.reduce((s,g)=>s+parseFloat(g.oreLav||0),0)
     : 0;
 
-  // ta_oreUsate: usa oreUsate/oreAddebitare dal wrapper SessioniJSON, poi calcolo da durate, poi OreLavoro SP
+  // ta_oreUsate: usa oreUsate/oreAddebitare dal wrapper SP, poi calcolo durate, poi OreLavoro
   const ta_oreUsate=isTelAss
     ? (ta_oreUsateSP||oreDA||parseFloat(f.OreLavoro||0))
     : 0;
@@ -4046,7 +4068,7 @@ function spItemToRT(item){
     dataCreazione:  item.createdDateTime||new Date().toISOString(),
     dataIntervento: f.DataIntervento?.split('T')[0]||'',
     giornate,
-    fotoCount:    0,  // NumFoto rimosso
+    fotoCount:    parseInt(f.NumFoto||0),
     firmaTec:     '',
     firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
@@ -4057,14 +4079,14 @@ function spItemToRT(item){
     minutiEffettivi: parseInt(f.MinutiEffettivi||0),
     oreEffettive:    parseFloat(f.OreEffettive||0),
     saldoPrima:   parseInt(f.SaldoPrima||0),
-    saldoDopo:    0,  // gestito dal Portale
+    saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
     sessioni,
     chiamate_data: f.DataIntervento?.split('T')[0]||'',
     ta_data:      f.DataIntervento?.split('T')[0]||f.DataIntervento||'',
     ta_minutiUsati:parseInt(f.MinutiUsati||0),
     ta_oreUsate,
-    ta_saldoDopo: null, // gestito dal Portale
+    ta_saldoDopo: f.SaldoDopo!=null?parseFloat(f.SaldoDopo):null,
     // Ore per dashboard
     _oreTA:       ta_oreUsate,
     _oreLoco:     oreLoco,
@@ -4103,7 +4125,7 @@ function rtToSPFields(rt){
     Preliminare:    rt.isPrelim||false,
     Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
-    // Telefonica
+    // Telefonica / Teleassistenza / On-Site
     TipoServizio:   rt.tipoServizio||'Standard',
     Pacchetto:      rt.pacchetto||'',
     MinutiUsati:     rt.minutiUsati||0,
