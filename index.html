@@ -428,6 +428,19 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 
   <!-- SEZIONE STANDARD (nascosta per Telefonica) -->
   <div id="gioStd">
+    <!-- Info pacchetto onsite/manutenzione -->
+    <div class="card" id="stdPacchettoInfo" style="display:none;margin-bottom:10px;border-left:3px solid #2ecc71">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Pacchetto</div>
+          <div id="stdPacchetto" style="font-size:16px;font-weight:700;color:#2ecc71">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Saldo disponibile</div>
+          <div id="stdSaldo" style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">—</div>
+        </div>
+      </div>
+    </div>
     <div id="gioList"></div>
     <button class="btn bgh bfl bsm" onclick="addG()" style="margin-bottom:8px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -522,7 +535,7 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
         </div>
         <div>
           <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee" id="taTotArr">0</div>
-          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Ore totali</div>
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Ore usate</div>
         </div>
         <div>
           <div style="font-size:20px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--ok)" id="taSaldoDopo">—</div>
@@ -993,7 +1006,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v142';
+const APP_VERSION='v144';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1580,9 +1593,9 @@ function aggiornaTotaliTel(){
   if(elArr){
     elArr.textContent=totArr;
     // Se Spot/Premium: nessun arrotondamento — grayed out
-    elArr.style.opacity=(pac==='Spot'||pac==='Premium')?'0.4':'1';
+    elArr.style.opacity='0.3';
     const lbl=elArr.nextElementSibling;
-    if(lbl) lbl.textContent=(pac==='Spot'||pac==='Premium')?'Min. (no arrot.)':'Min. arrotondati';
+    if(lbl) lbl.textContent='(= effettivi)';
   }
   if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo+' min':'N/A';
 }
@@ -1732,12 +1745,13 @@ function aggiornaTotaliTA(){
     s.durata=dur;
     totMin+=dur;
   });
-  // Arrotondamento 30min sul totale (Base e Standard)
-  const totArr=(pac==='Spot'||pac==='Premium')?totMin:Math.ceil(totMin/30)*30;
+  // Nessun arrotondamento — solo consumo effettivo
+  const totArr=totMin;
   const totOre=parseFloat((totArr/60).toFixed(2));
   cRT.ta_minutiUsati=totArr;
   cRT.ta_oreUsate=totOre;
-  // Saldo in ore
+  cRT.oreEffettive=totOre;
+  // Saldo in ore (solo visualizzazione, non arrotondato)
   let saldoDopo=null;
   if(pac!=='Spot'&&pac!=='Premium'){
     saldoDopo=Math.max(0,(contr.saldoOre||0)-totOre);
@@ -1746,8 +1760,8 @@ function aggiornaTotaliTA(){
   const elMin=document.getElementById('taTotMin');
   const elArr=document.getElementById('taTotArr');
   const elDopo=document.getElementById('taSaldoDopo');
-  if(elMin) elMin.textContent=parseFloat((totMin/60).toFixed(2))+' h';
-  if(elArr) elArr.textContent=parseFloat((totArr/60).toFixed(2))+' h';
+  if(elMin) elMin.textContent=totOre+' h';
+  if(elArr) elArr.textContent=totOre+' h';
   if(elDopo) elDopo.textContent=(saldoDopo!==null)?saldoDopo.toFixed(2)+' h':'N/A';
 }
 
@@ -1850,6 +1864,29 @@ function switchGioMode(){
   }
   if(isTel) initTelefonica();
   if(isTA)  initTeleassistenza();
+  if(!isTel&&!isTA) initStd();
+}
+
+function initStd(){
+  if(!cRT.cliente) return;
+  // Determina tipo contratto in base al tipo intervento
+  const tp=cRT.tipo||'';
+  const tipoContr=tp.includes('Manutenzione')?'Manutenzione':'Manutenzione'; // default Manutenzione per onsite
+  const contr=getContratto(cRT.cliente, tipoContr);
+  const card=document.getElementById('stdPacchettoInfo');
+  const elPac=document.getElementById('stdPacchetto');
+  const elSaldo=document.getElementById('stdSaldo');
+  if(!card) return;
+  if(!contr||contr.pacchetto==='Spot'){
+    card.style.display='none';
+    return;
+  }
+  card.style.display='block';
+  if(elPac) elPac.textContent=contr.pacchetto||'—';
+  const saldo=contr.saldoOre!=null?contr.saldoOre+'h':'—';
+  if(elSaldo) elSaldo.textContent=saldo;
+  cRT.pacchetto=contr.pacchetto;
+  cRT.saldoPrima=contr.saldoOre||0;
 }
 
 // Quando si cambia il tipo intervento in scrDati, aggiorna la label del bottone avanti
@@ -2410,7 +2447,7 @@ function buildPDFTelefonica(rt,fT,fC,prelim,l){
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td class="tdl" colspan="2"><b>${L.tot}</b></td>
-        <td><b>${totDur} min → ${totArr} min ${l==='IT'?'(arrotondati)':'(rounded)'}</b></td>
+        <td><b>${totDur} min</b></td>
         <td></td>
       </tr></tfoot>
     </table>
@@ -2432,7 +2469,7 @@ function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
   const saldoPrima=(pac==='Spot'||pac==='Premium')?null:(rt.saldoPrima||0);
   const saldoDopo=(pac==='Spot'||pac==='Premium')?null:(rt.ta_saldoDopo!==null&&rt.ta_saldoDopo!==undefined?rt.ta_saldoDopo:null);
   const totMin=sessioni.reduce((s,x)=>s+(x.durata||calcDurataMin(x.inizio,x.fine)),0);
-  const totArr=(pac==='Spot'||pac==='Premium')?totMin:Math.ceil(totMin/30)*30;
+  const totArr=totMin; // nessun arrotondamento
   const totOre=parseFloat((totArr/60).toFixed(2));
   const logoB64=LOGO_PDF;
   const rows=sessioni.map(s=>{
@@ -2492,7 +2529,7 @@ function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
       <tbody>${rows}</tbody>
       <tfoot><tr>
         <td class="tdl" colspan="3"><b>${L.tot}</b></td>
-        <td><b>${totOre} h</b></td>
+        <td><b>${parseFloat((totMin/60).toFixed(2))} h</b></td>
         <td></td>
       </tr></tfoot>
     </table>
