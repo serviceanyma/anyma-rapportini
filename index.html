@@ -993,7 +993,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v141';
+const APP_VERSION='v142';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1041,27 +1041,43 @@ function tSelTA(inizio, val, onch){
   return `<select class="fc"${''} onchange="${onch}">${o}</select>`;
 }
 
+// ── Handler globale per tSelHHMM ──
+const _tsCB={};
+let _tsCBIdx=0;
+function _tsChange(el,isHH){
+  const wrap=el.closest('.ts-wrap');
+  if(!wrap) return;
+  const selH=wrap.querySelector('.tshh');
+  const selM=wrap.querySelector('.tsmm');
+  const hh=selH?.value||'';
+  const mm=selM?.value||'00';
+  const cbKey=wrap.dataset.cb;
+  const fn=_tsCB[cbKey];
+  if(!fn) return;
+  fn(hh ? hh+':'+mm : '');
+}
+
 // Selettore orario con 2 select affiancati: HH e MM (step 15)
-// onch riceve il valore combinato "HH:MM"
 function tSelHHMM(val, onch, style=''){
-  const hh=val?parseInt(val.split(':')[0])||0:0;
-  const mm=val?parseInt(val.split(':')[1])||0:0;
+  const hh=val?parseInt(val.split(':')[0]):null;
+  const mm=val?Math.round(parseInt(val.split(':')[1])/15)*15:0;
+  const safeM=[0,15,30,45].includes(mm)?mm:0;
+  // Genera callback key univoca
+  const key='ts'+(++_tsCBIdx);
+  _tsCB[key]=new Function('v', onch.replace(/this\.value/g,'v'));
   // Select ore 0-24
   let oH='<option value="">—</option>';
-  for(let h=0;h<=24;h++){
-    const v=String(h).padStart(2,'0');
-    oH+=`<option value="${v}"${h===hh&&val?' selected':''}>${v}</option>`;
+  for(let i=0;i<=24;i++){
+    const v=String(i).padStart(2,'0');
+    oH+=`<option value="${v}"${hh===i&&val!==''&&val!=null?' selected':''}>${v}</option>`;
   }
   // Select minuti 00,15,30,45
   let oM='';
   [0,15,30,45].forEach(m=>{
     const v=String(m).padStart(2,'0');
-    oM+=`<option value="${v}"${m===mm&&val?' selected':''}>${v}</option>`;
+    oM+=`<option value="${v}"${m===safeM&&val?' selected':''}>${v}</option>`;
   });
-  // onChange combina HH:MM e chiama onch
-  const cbH=`(function(el){var mm=el.parentElement.querySelector('.tsmm').value||'00';if(el.value){(function(v){${onch}})(el.value+':'+mm);}else{(function(v){${onch}})('');}})( this)`;
-  const cbM=`(function(el){var hh=el.parentElement.querySelector('.tshh').value;if(hh){(function(v){${onch}})(hh+':'+el.value);}})( this)`;
-  return `<div style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="${cbH}">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="${cbM}">${oM}</select></div>`;
+  return `<div class="ts-wrap" data-cb="${key}" style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="_tsChange(this,true)">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="_tsChange(this,false)">${oM}</select></div>`;
 }
 
 function tSel(val,onch,style=''){
