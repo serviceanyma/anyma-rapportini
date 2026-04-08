@@ -1006,7 +1006,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v144';
+const APP_VERSION='v145';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1877,15 +1877,12 @@ function initStd(){
   const elPac=document.getElementById('stdPacchetto');
   const elSaldo=document.getElementById('stdSaldo');
   if(!card) return;
-  if(!contr||contr.pacchetto==='Spot'){
-    card.style.display='none';
-    return;
-  }
   card.style.display='block';
-  if(elPac) elPac.textContent=contr.pacchetto||'—';
-  const saldo=contr.saldoOre!=null?contr.saldoOre+'h':'—';
+  if(elPac) elPac.textContent=contr.pacchetto||'Spot';
+  const isSpot=!contr||contr.pacchetto==='Spot'||contr.pacchetto==='Premium';
+  const saldo=isSpot?'N/A':(contr.saldoOre!=null?contr.saldoOre.toFixed(2)+' h':'—');
   if(elSaldo) elSaldo.textContent=saldo;
-  cRT.pacchetto=contr.pacchetto;
+  cRT.pacchetto=contr.pacchetto||'Spot';
   cRT.saldoPrima=contr.saldoOre||0;
 }
 
