@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v156';
+const APP_VERSION='v158';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2385,20 +2385,36 @@ async function salvaCfgF(){
   saveDB();
   toast('✓ Firma salvata in locale','suc');
   renderCfg();
-  // Salva su SP — usa m365GetToken() per token aggiornato
+  // Diagnosi stato M365
+  const log=document.getElementById('firmaSPLog');
+  const out=s=>{if(log){log.textContent+=s+'\n';console.log(s);}else console.log(s);};
+  if(log) log.textContent='';
+  out('m365Token: '+(m365Token?'presente ('+m365Token.length+'c)':'null'));
+  out('m365User: '+(m365User?.displayName||'null')+' / '+(m365User?.mail||m365User?.userPrincipalName||'—'));
+  out('_account: '+(m365User?._account?'presente':'null'));
+  // Ottieni token aggiornato
   let tok=null;
-  try{ tok=await m365GetToken(); }catch(e){}
-  if(tok){
-    toast('☁️ Invio firma su SP...','wrn');
-    try{
-      await spSalvaFirmaTecnico(firma);
-      toast('☁️ Firma sincronizzata su SP','suc',5000);
-    }catch(e){
-      console.error('SP firma error:',e);
-      toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
-    }
-  } else {
+  try{
+    tok=await m365GetToken();
+    out('m365GetToken() → '+(tok?'ok ('+tok.length+'c)':'null'));
+  }catch(e){
+    out('m365GetToken() ERRORE: '+e.message);
+  }
+  if(!tok){
     toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
+    out('STOP: nessun token valido');
+    return;
+  }
+  toast('☁️ Invio firma su SP...','wrn');
+  out('Chiamo spSalvaFirmaTecnico...');
+  try{
+    await spSalvaFirmaTecnico(firma);
+    toast('☁️ Firma sincronizzata su SP','suc',5000);
+    out('✓ Firma salvata su SP');
+  }catch(e){
+    console.error('SP firma error:',e);
+    toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
+    out('ERRORE SP: '+e.message);
   }
 }
 
@@ -4544,31 +4560,43 @@ async function spSalvaFirmaTecnico(firmaB64){
   const listId=await spGetTecListId();
   if(!listId) throw new Error('Lista AnymaTecnici non trovata su SP');
   console.log('spSalvaFirmaTecnico: listId=',listId,'email=',email);
+  // Log diagnostico (usa firmaSPLog se presente)
+  const _log=document.getElementById('firmaSPLog');
+  const _out=s=>{if(_log){_log.textContent+=s+'\n';}console.log('[spSalvaFirmaTecnico]',s);};
+  _out('tok: '+(tok?tok.length+'c':'null')+' | email: '+email+' | listId: '+listId);
+  _out('firmaDim: '+Math.round(firmaB64.length/1024)+'KB');
   // Cerca item esistente
   const r=await fetch(
     `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$filter=fields/Title eq '${encodeURIComponent(email)}'&$top=1`,
     {headers:{Authorization:`Bearer ${tok}`}}
   );
-  if(!r.ok) throw new Error('Errore ricerca item SP: '+r.status);
+  _out('Ricerca item HTTP: '+r.status);
+  if(!r.ok){const txt=await r.text();_out('ERR body: '+txt.substring(0,300));throw new Error('Errore ricerca item SP: '+r.status);}
   const d=await r.json();
+  _out('Items trovati: '+d.value?.length);
   if(d.value?.length){
     // Aggiorna item esistente
     const itemId=d.value[0].id;
+    _out('PATCH item '+itemId+'...');
     const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${itemId}/fields`,{
       method:'PATCH',
       headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
       body:JSON.stringify({FirmaBase64:firmaB64})
     });
-    if(!r2.ok) throw new Error('Errore aggiornamento firma SP: '+r2.status+' '+(await r2.text()).substring(0,200));
+    _out('PATCH HTTP: '+r2.status);
+    if(!r2.ok){const txt=await r2.text();_out('ERR: '+txt.substring(0,300));throw new Error('Errore aggiornamento firma SP: '+r2.status);}
   } else {
     // Crea nuovo item
+    _out('POST nuovo item...');
     const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items`,{
       method:'POST',
       headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
       body:JSON.stringify({fields:{Title:email,FirmaBase64:firmaB64}})
     });
-    if(!r2.ok) throw new Error('Errore creazione firma SP: '+r2.status+' '+(await r2.text()).substring(0,200));
+    _out('POST HTTP: '+r2.status);
+    if(!r2.ok){const txt=await r2.text();_out('ERR: '+txt.substring(0,300));throw new Error('Errore creazione firma SP: '+r2.status);}
   }
+  _out('✓ OK salvato su SP');
   console.log('Firma tecnico salvata su SP');
 }
 
