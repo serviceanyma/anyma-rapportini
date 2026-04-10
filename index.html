@@ -468,8 +468,8 @@ ${fontImport}
       </div>
     </div>
     <div id="gioList"></div>
-    <button class="btn bgh bfl bsm" onclick="addG()" style="margin-bottom:8px">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bfl" onclick="addG()" style="margin-bottom:8px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi giornata
     </button>
     <div class="totbar" style="margin-bottom:14px">
@@ -503,8 +503,8 @@ ${fontImport}
     </div>
     <!-- Lista chiamate -->
     <div id="telChiamateList"></div>
-    <button class="btn bgh bfl bsm" onclick="addChiamata()" style="margin-bottom:10px">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bfl" onclick="addChiamata()" style="margin-bottom:10px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi chiamata
     </button>
     <!-- Totali sessione -->
@@ -548,8 +548,8 @@ ${fontImport}
     </div>
     <!-- Lista sessioni -->
     <div id="taSessioniList"></div>
-    <button class="btn bgh bfl bsm" onclick="addSessioneTA()" style="margin-bottom:10px">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bfl" onclick="addSessioneTA()" style="margin-bottom:10px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi sessione
     </button>
     <!-- Totali -->
@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v150';
+const APP_VERSION='v151';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1066,7 +1066,6 @@ function _tsChange(el,isHH){
   const selM=wrap.querySelector('.tsmm');
   const hh=selH?.value||'';
   let mm=selM?.value||'00';
-  // Se c'è un minVal e stiamo cambiando HH, aggiorna le opzioni MM disponibili
   if(isHH && wrap.dataset.minVal){
     const minTotMin=parseInt(wrap.dataset.minVal)||0;
     const minHH=Math.floor(minTotMin/60);
@@ -1088,12 +1087,11 @@ function _tsChange(el,isHH){
 }
 
 // Selettore orario con 2 select affiancati: HH e MM (step 15)
-// minVal: stringa "HH:MM" — se fornita, le opzioni partono da quell'orario +15min in avanti
+// minVal: "HH:MM" — se fornita, le opzioni Fine partono da inizio+15min
 function tSelHHMM(val, onch, style='', minVal=''){
   const hh=val?parseInt(val.split(':')[0]):null;
   const mm=val?Math.round(parseInt(val.split(':')[1])/15)*15:0;
   const safeM=[0,15,30,45].includes(mm)?mm:0;
-  // Calcola minimo in minuti (inizio + 15min)
   let minTotMin=0;
   if(minVal){
     const mhh=parseInt(minVal.split(':')[0])||0;
@@ -1102,16 +1100,13 @@ function tSelHHMM(val, onch, style='', minVal=''){
   }
   const minHH=Math.floor(minTotMin/60);
   const minMM=minTotMin%60;
-  // Genera callback key univoca
   const key='ts'+(++_tsCBIdx);
   _tsCB[key]=new Function('v', onch.replace(/this\.value/g,'v'));
-  // Select ore: parte da minHH
   let oH='<option value="">—</option>';
   for(let i=minHH;i<=24;i++){
     const v=String(i).padStart(2,'0');
     oH+=`<option value="${v}"${hh===i&&val!==''&&val!=null?' selected':''}>${v}</option>`;
   }
-  // Select minuti: se HH corrente == minHH, parte da minMM
   const curHH=hh!==null?hh:(minVal?minHH:0);
   const mmStart=(minVal&&curHH===minHH)?minMM:0;
   let oM='';
@@ -2602,12 +2597,11 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA ${cliObj.piva}`:'')).trim();
   const dateStr=rt.dataCreazione?new Date(rt.dataCreazione).toLocaleDateString('it-IT'):'';
   const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
-  // Box pacchetto pre-calcolato (evita template literal annidati con backtick)
   const _pac=rt.pacchetto||'Spot';
   const _saldoP=rt.saldoPrima||0;
   const boxPacchetto=(_pac&&_pac!=='Spot')
     ?'<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">'
-      +'<span><b>'+(l==='IT'?'Pacchetto':'Package')+':</b> '+_pac+'</span>'
+      +'<span><b>'+(_pac==='IT'?'Pacchetto':'Pacchetto')+':</b> '+_pac+'</span>'
       +'<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_saldoP+' h</span>'
       +'</div>'
     :'';
@@ -4020,7 +4014,6 @@ function spItemToRT(item){
   try{
     if(f.SessioniJSON){
       const raw=JSON.parse(f.SessioniJSON);
-      // Supporta: array puro (legacy), {sessioni:[], oreUsate} (nuovo), {sessioni:[], oreAddebitare} (vecchio)
       sessioni=Array.isArray(raw)?raw:(raw.sessioni||[]);
       ta_oreUsateSP=parseFloat(raw.oreUsate??raw.oreAddebitare??0)||0;
     }
@@ -4044,7 +4037,7 @@ function spItemToRT(item){
     ? giornate.reduce((s,g)=>s+parseFloat(g.oreLav||0),0)
     : 0;
 
-  // ta_oreUsate: usa oreUsate/oreAddebitare dal wrapper SP, poi calcolo durate, poi OreLavoro
+  // ta_oreUsate: usa oreDA se disponibile, altrimenti OreLavoro (campo numerico SP)
   const ta_oreUsate=isTelAss
     ? (ta_oreUsateSP||oreDA||parseFloat(f.OreLavoro||0))
     : 0;
@@ -4125,7 +4118,7 @@ function rtToSPFields(rt){
     Preliminare:    rt.isPrelim||false,
     Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
-    // Telefonica / Teleassistenza / On-Site
+    // Telefonica
     TipoServizio:   rt.tipoServizio||'Standard',
     Pacchetto:      rt.pacchetto||'',
     MinutiUsati:     rt.minutiUsati||0,
