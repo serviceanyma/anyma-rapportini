@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v151';
+const APP_VERSION='v152';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1107,8 +1107,9 @@ function tSelHHMM(val, onch, style='', minVal=''){
     const v=String(i).padStart(2,'0');
     oH+=`<option value="${v}"${hh===i&&val!==''&&val!=null?' selected':''}>${v}</option>`;
   }
-  const curHH=hh!==null?hh:(minVal?minHH:0);
-  const mmStart=(minVal&&curHH===minHH)?minMM:0;
+  // curHH: null se val è vuoto (nessuna preselazione), altrimenti valore effettivo
+  const curHH=hh!==null?hh:null;
+  const mmStart=(curHH!==null&&minVal&&curHH===minHH)?minMM:0;
   let oM='';
   [0,15,30,45].filter(m=>m>=mmStart).forEach(m=>{
     const v=String(m).padStart(2,'0');
