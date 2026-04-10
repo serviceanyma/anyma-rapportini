@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v152';
+const APP_VERSION='v154';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2380,7 +2380,7 @@ async function testFirmaSP(){
 
 function salvaCfgF(){
   if(!FC['cfg']?.cv)return;
-  const firma=FC['cfg'].cv.toDataURL();
+  const firma=FC['cfg'].cv.toDataURL('image/jpeg',0.5);
   db.config.firmaSalvata=firma;
   saveDB();
   toast('✓ Firma salvata in locale','suc');
@@ -2401,12 +2401,12 @@ function salvaCfgF(){
 
 function getFT(){
   if(usaSalvata&&db.config.firmaSalvata)return db.config.firmaSalvata;
-  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL();
+  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL('image/jpeg',0.5);
   // Fallback: se c'è firma salvata usala anche se non esplicitamente selezionata
   if(db.config.firmaSalvata)return db.config.firmaSalvata;
   return '';
 }
-function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL();return '';}
+function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL('image/jpeg',0.5);return '';}
 
 // ══════════════════════════════════════
 // BUILD PDF HTML (A4 794px wide)
@@ -3225,8 +3225,15 @@ ${serviceEmail}`;
 // ══════════════════════════════════════
 // DETTAGLIO
 // ══════════════════════════════════════
-function openDet(id){
+async function openDet(id){
   const rt=db.rapportini.find(r=>r.id===id);if(!rt)return;
+  // Carica firma tecnico da SP se non presente localmente
+  if(!rt.firmaTec&&m365Token&&db.config.firmaSalvata){
+    rt.firmaTec=db.config.firmaSalvata;
+  } else if(!rt.firmaTec&&m365Token){
+    await spLoadFirmaTecnico();
+    if(db.config.firmaSalvata) rt.firmaTec=db.config.firmaSalvata;
+  }
   cDet=rt;
   const mobileW=Math.min(window.innerWidth-30,750);
   const scale=mobileW/750;
@@ -3248,12 +3255,18 @@ function openDet(id){
   showScr('scrDet');
 }
 function modRT(){
+  // Firma cliente solo locale — avvisa se presente prima di modificare
+  if(cDet.firmaCli){
+    if(!confirm('⚠️ Attenzione\n\nModificando il rapportino la firma del cliente verrà rimossa.\n\nAssicurati di aver già salvato/inviato il PDF firmato.\n\nProcedere?')) return;
+  }
   isMod=true;cRT={...cDet};
+  // Azzera firma cliente: non persiste dopo una modifica
+  cRT.firmaCli='';
   gio=cRT.giornate?cRT.giornate.map(g=>({...g})):[makeG()];
   // Ripristina chiamate telefonica
   telChiamate=(cRT.chiamate||[]).map(c=>({...c}));
   taSessioni=(cRT.sessioni||[]).map(s=>({...s}));
-  fotos=[];fSt={tec:!!cRT.firmaTec,cli:!!cRT.firmaCli};
+  fotos=[];fSt={tec:!!cRT.firmaTec,cli:false};
   lang=cRT.lang||'EN';isPr=cRT.isPrelim||false;
   selTec=cRT.tecnici?cRT.tecnici.split(', ').filter(Boolean):[];
   populateDDs();goStep(1);
@@ -3265,7 +3278,10 @@ function delRT(){
   saveDB();toast('Eliminato','wrn');goHome();renderHome();
 }
 function inviaEmail(){inviaEmailRT(cDet);}
-function scaricaPDF(){generatePDF(cDet,cDet.giornate||[],cDet.firmaTec||'',cDet.firmaCli||'');}
+async function scaricaPDF(){
+  if(!cDet.firmaTec&&db.config.firmaSalvata) cDet.firmaTec=db.config.firmaSalvata;
+  generatePDF(cDet,cDet.giornate||[],cDet.firmaTec||'',cDet.firmaCli||'');
+}
 
 // ══════════════════════════════════════
 // CLIENTI
@@ -4063,8 +4079,8 @@ function spItemToRT(item){
     dataIntervento: f.DataIntervento?.split('T')[0]||'',
     giornate,
     fotoCount:    parseInt(f.NumFoto||0),
-    firmaTec:     '',
-    firmaCli:     '',
+    firmaTec:     '',   // caricata da AnymaTecnici on-demand
+    firmaCli:     '',    // solo locale, non persistita su SP
     odPdfUrl:     f.PDFUrl||'',
     // Telefonica
     tipoServizio,
