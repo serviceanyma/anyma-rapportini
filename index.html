@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v154';
+const APP_VERSION='v155';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2378,22 +2378,25 @@ async function testFirmaSP(){
   }catch(e){out('ERRORE:',e.message);}
 }
 
-function salvaCfgF(){
+async function salvaCfgF(){
   if(!FC['cfg']?.cv)return;
   const firma=FC['cfg'].cv.toDataURL('image/jpeg',0.5);
   db.config.firmaSalvata=firma;
   saveDB();
   toast('✓ Firma salvata in locale','suc');
   renderCfg();
-  // Salva su SP
-  if(m365Token){
+  // Salva su SP — usa m365GetToken() per token aggiornato
+  let tok=null;
+  try{ tok=await m365GetToken(); }catch(e){}
+  if(tok){
     toast('☁️ Invio firma su SP...','wrn');
-    spSalvaFirmaTecnico(firma)
-      .then(()=>toast('☁️ Firma sincronizzata su SP','suc',5000))
-      .catch(e=>{
-        console.error('SP firma error:',e);
-        toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
-      });
+    try{
+      await spSalvaFirmaTecnico(firma);
+      toast('☁️ Firma sincronizzata su SP','suc',5000);
+    }catch(e){
+      console.error('SP firma error:',e);
+      toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
+    }
   } else {
     toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
   }
