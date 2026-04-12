@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v161d';
+const APP_VERSION='v162';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -4548,11 +4548,12 @@ async function spLoadFirmaTecnico(){
   if(!listId||!tok) return;
   try{
     const r=await fetch(
-      `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$filter=fields/Title eq '${encodeURIComponent(email)}'&$top=1`,
+      `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=50`,
       {headers:{Authorization:`Bearer ${tok}`}}
     );
     const d=await r.json();
-    const firma=d.value?.[0]?.fields?.FirmaBase64;
+    const match=d.value?.find(it=>(it.fields?.Title||'').toLowerCase()===email.toLowerCase());
+    const firma=match?.fields?.FirmaBase64;
     if(firma&&firma.length>100){
       db.config.firmaSalvata=firma;
       saveDB();
@@ -4576,43 +4577,39 @@ async function spSalvaFirmaTecnico(firmaB64){
   const listId=await spGetTecListId();
   if(!listId) throw new Error('Lista AnymaTecnici non trovata su SP');
   console.log('spSalvaFirmaTecnico: listId=',listId,'email=',email);
-  // Log diagnostico (usa firmaSPLog se presente)
+  // Log diagnostico
   const _log=document.getElementById('firmaSPLog');
   const _out=s=>{if(_log){_log.textContent+=s+'\n';}console.log('[spSalvaFirmaTecnico]',s);};
-  _out('tok: '+(tok?tok.length+'c':'null')+' | email: '+email+' | listId: '+listId);
-  _out('firmaDim: '+Math.round(firmaB64.length/1024)+'KB');
-  // Cerca item esistente
+  // Scarica tutti gli item (lista piccola, max ~10 tecnici) — evita $filter che SP rifiuta
   const r=await fetch(
-    `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$filter=fields/Title eq '${encodeURIComponent(email)}'&$top=1`,
+    `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=50`,
     {headers:{Authorization:`Bearer ${tok}`}}
   );
-  _out('Ricerca item HTTP: '+r.status);
-  if(!r.ok){const txt=await r.text();_out('ERR body: '+txt.substring(0,300));throw new Error('Errore ricerca item SP: '+r.status);}
+  if(!r.ok){const txt=await r.text();_out('ERR lista: '+r.status+' '+txt.substring(0,200));throw new Error('Errore lettura lista AnymaTecnici: '+r.status);}
   const d=await r.json();
-  _out('Items trovati: '+d.value?.length);
-  if(d.value?.length){
+  // Filtra lato client per email (case-insensitive)
+  const existing=d.value?.find(it=>
+    (it.fields?.Title||'').toLowerCase()===email.toLowerCase()
+  );
+  if(existing){
     // Aggiorna item esistente
-    const itemId=d.value[0].id;
-    _out('PATCH item '+itemId+'...');
-    const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${itemId}/fields`,{
+    const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${existing.id}/fields`,{
       method:'PATCH',
       headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
       body:JSON.stringify({FirmaBase64:firmaB64})
     });
-    _out('PATCH HTTP: '+r2.status);
-    if(!r2.ok){const txt=await r2.text();_out('ERR: '+txt.substring(0,300));throw new Error('Errore aggiornamento firma SP: '+r2.status);}
+    if(!r2.ok){const txt=await r2.text();throw new Error('Errore PATCH firma: '+r2.status+' '+txt.substring(0,200));}
+    _out('PATCH ok — item '+existing.id);
   } else {
     // Crea nuovo item
-    _out('POST nuovo item...');
     const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items`,{
       method:'POST',
       headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
       body:JSON.stringify({fields:{Title:email,FirmaBase64:firmaB64}})
     });
-    _out('POST HTTP: '+r2.status);
-    if(!r2.ok){const txt=await r2.text();_out('ERR: '+txt.substring(0,300));throw new Error('Errore creazione firma SP: '+r2.status);}
+    if(!r2.ok){const txt=await r2.text();throw new Error('Errore POST firma: '+r2.status+' '+txt.substring(0,200));}
+    _out('POST ok — nuovo item creato');
   }
-  _out('✓ OK salvato su SP');
   console.log('Firma tecnico salvata su SP');
 }
 
