@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v159d';
+const APP_VERSION='v160d';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2404,6 +2404,7 @@ async function salvaCfgF(){
   if(!tok){
     toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
     out('STOP: nessun token valido');
+    alert('=== LOG SALVA FIRMA ===\n'+_msgs.join('\n'));
     return;
   }
   toast('☁️ Invio firma su SP...','wrn');
