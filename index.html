@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v163';
+const APP_VERSION='v164';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2248,7 +2248,10 @@ function setupCanvas(id, key, onEndExtra){
   // Ricarica immagine salvata se presente (per Config)
   if(key==='cfg'&&db.config.firmaSalvata){
     const img=new Image();
-    img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);
+    img.onload=()=>{
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.drawImage(img,0,0,cv.width,cv.height);
+    };
     img.src=db.config.firmaSalvata;
     const ph=document.getElementById('phCfg');
     if(ph) ph.style.display='none';
@@ -2285,7 +2288,9 @@ function setupCfgF(){
       cv.ontouchmove=e=>{e.preventDefault();dr('cfg',e.touches[0]);};
       cv.ontouchend=()=>{ed('cfg');};
       if(db.config.firmaSalvata){
-        const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);img.src=db.config.firmaSalvata;
+        const img=new Image();
+        img.onload=()=>{ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0,cv.width,cv.height);};
+        img.src=db.config.firmaSalvata;
         const ph=document.getElementById('phCfg');if(ph)ph.style.display='none';
       }
     });
@@ -2394,7 +2399,7 @@ async function salvaCfgF(){
     toast('⚠️ Canvas non pronto — premi ↺ Attiva','err',6000);
     return;
   }
-  const firma=FC['cfg'].cv.toDataURL('image/jpeg',0.5);
+  const firma=FC['cfg'].cv.toDataURL('image/png');
   out('firmaDim: '+Math.round(firma.length/1024)+'KB');
   db.config.firmaSalvata=firma;
   saveDB();
@@ -2436,12 +2441,12 @@ async function salvaCfgF(){
 
 function getFT(){
   if(usaSalvata&&db.config.firmaSalvata)return db.config.firmaSalvata;
-  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL('image/jpeg',0.5);
+  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL('image/png');
   // Fallback: se c'è firma salvata usala anche se non esplicitamente selezionata
   if(db.config.firmaSalvata)return db.config.firmaSalvata;
   return '';
 }
-function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL('image/jpeg',0.5);return '';}
+function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL('image/png');return '';}
 
 // ══════════════════════════════════════
 // BUILD PDF HTML (A4 794px wide)
@@ -2749,8 +2754,8 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
 // RENDER PREVIEW (scaled for mobile)
 // ══════════════════════════════════════
 function renderPreview(containerId){
-  const fT=fSt.tec?(usaSalvata?db.config.firmaSalvata:FC['tec']?.cv?.toDataURL()||''):'';
-  const fC=fSt.cli?FC['cli']?.cv?.toDataURL()||'':'';
+  const fT=fSt.tec?(usaSalvata?db.config.firmaSalvata:FC['tec']?.cv?.toDataURL('image/png')||''):'';
+  const fC=fSt.cli?FC['cli']?.cv?.toDataURL('image/png')||'':'';
   const html=buildPDFHTML(cRT,gio,fT,fC,isPr,lang);
   const container=document.getElementById(containerId);
   const mobileW=Math.min(window.innerWidth-30,750);
