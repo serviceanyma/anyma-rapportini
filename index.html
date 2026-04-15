@@ -2626,14 +2626,14 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
     </div>
 
     <!-- PACCHETTO (se non Spot) -->
-    \${(()=>{
+    ${(()=>{
       const pac=rt.pacchetto||'Spot';
       const saldoP=rt.saldoPrima||0;
       const isSpot=!pac||pac==='Spot';
-      if(!isSpot) return \`<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
-        <span><b>\${l==='IT'?'Pacchetto':'Package'}:</b> \${pac}</span>
-        <span><b>\${l==='IT'?'Saldo iniziale':'Opening balance'}:</b> \${saldoP} h</span>
-      </div>\`;
+      if(!isSpot) return `<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
+        <span><b>${l==='IT'?'Pacchetto':'Package'}:</b> ${pac}</span>
+        <span><b>${l==='IT'?'Saldo iniziale':'Opening balance'}:</b> ${saldoP} h</span>
+      </div>`;
       return '';
     })()}
     <!-- TABELLA ORARIO -->
@@ -2858,7 +2858,7 @@ async function generatePDFBlob(rt,gd,fT,fC){
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const pdfPage=tpl.querySelector('.pdf-page')||tpl.firstElementChild||tpl;
     // Margini A4: 12mm su tutti i lati → area contenuto 186×273mm
-    const marginMm=12;
+    const marginMm=15;
     const contentWmm=210-(marginMm*2); // 186mm
     const contentHmm=297-(marginMm*2); // 273mm
     const pageWidthPx=750;
