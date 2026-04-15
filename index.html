@@ -468,8 +468,8 @@ ${fontImport}
       </div>
     </div>
     <div id="gioList"></div>
-    <button class="btn bfl" onclick="addG()" style="margin-bottom:8px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bgh bfl bsm" onclick="addG()" style="margin-bottom:8px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi giornata
     </button>
     <div class="totbar" style="margin-bottom:14px">
@@ -503,8 +503,8 @@ ${fontImport}
     </div>
     <!-- Lista chiamate -->
     <div id="telChiamateList"></div>
-    <button class="btn bfl" onclick="addChiamata()" style="margin-bottom:10px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bgh bfl bsm" onclick="addChiamata()" style="margin-bottom:10px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi chiamata
     </button>
     <!-- Totali sessione -->
@@ -548,8 +548,8 @@ ${fontImport}
     </div>
     <!-- Lista sessioni -->
     <div id="taSessioniList"></div>
-    <button class="btn bfl" onclick="addSessioneTA()" style="margin-bottom:10px;padding:16px 12px;font-size:14px;font-weight:700;border:2px dashed var(--cr);background:rgba(139,26,26,.08);color:var(--cr);border-radius:var(--r)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <button class="btn bgh bfl bsm" onclick="addSessioneTA()" style="margin-bottom:10px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Aggiungi sessione
     </button>
     <!-- Totali -->
@@ -1031,7 +1031,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v165';
+const APP_VERSION='v150';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1065,21 +1065,7 @@ function _tsChange(el,isHH){
   const selH=wrap.querySelector('.tshh');
   const selM=wrap.querySelector('.tsmm');
   const hh=selH?.value||'';
-  let mm=selM?.value||'00';
-  if(isHH && wrap.dataset.minVal){
-    const minTotMin=parseInt(wrap.dataset.minVal)||0;
-    const minHH=Math.floor(minTotMin/60);
-    const minMM=minTotMin%60;
-    const curHH=parseInt(hh)||0;
-    const mmStart=(curHH===minHH)?minMM:0;
-    const validMMs=[0,15,30,45].filter(m=>m>=mmStart);
-    const curMM=parseInt(mm)||0;
-    selM.innerHTML=validMMs.map(m=>{
-      const v=String(m).padStart(2,'0');
-      return `<option value="${v}"${m===curMM?' selected':''}>${v}</option>`;
-    }).join('');
-    if(!validMMs.includes(curMM)) mm=String(validMMs[0]||0).padStart(2,'0');
-  }
+  const mm=selM?.value||'00';
   const cbKey=wrap.dataset.cb;
   const fn=_tsCB[cbKey];
   if(!fn) return;
@@ -1087,37 +1073,26 @@ function _tsChange(el,isHH){
 }
 
 // Selettore orario con 2 select affiancati: HH e MM (step 15)
-// minVal: "HH:MM" — se fornita, le opzioni Fine partono da inizio+15min
-function tSelHHMM(val, onch, style='', minVal=''){
+function tSelHHMM(val, onch, style=''){
   const hh=val?parseInt(val.split(':')[0]):null;
   const mm=val?Math.round(parseInt(val.split(':')[1])/15)*15:0;
   const safeM=[0,15,30,45].includes(mm)?mm:0;
-  let minTotMin=0;
-  if(minVal){
-    const mhh=parseInt(minVal.split(':')[0])||0;
-    const mmm=Math.round((parseInt(minVal.split(':')[1])||0)/15)*15;
-    minTotMin=mhh*60+mmm+15;
-  }
-  const minHH=Math.floor(minTotMin/60);
-  const minMM=minTotMin%60;
+  // Genera callback key univoca
   const key='ts'+(++_tsCBIdx);
   _tsCB[key]=new Function('v', onch.replace(/this\.value/g,'v'));
+  // Select ore 0-24
   let oH='<option value="">—</option>';
-  for(let i=minHH;i<=24;i++){
+  for(let i=0;i<=24;i++){
     const v=String(i).padStart(2,'0');
     oH+=`<option value="${v}"${hh===i&&val!==''&&val!=null?' selected':''}>${v}</option>`;
   }
-  // curHH: null se val è vuoto (nessuna preselazione), altrimenti valore effettivo
-  const curHH=hh!==null?hh:null;
-  const mmStart=(curHH!==null&&minVal&&curHH===minHH)?minMM:0;
+  // Select minuti 00,15,30,45
   let oM='';
-  [0,15,30,45].filter(m=>m>=mmStart).forEach(m=>{
+  [0,15,30,45].forEach(m=>{
     const v=String(m).padStart(2,'0');
     oM+=`<option value="${v}"${m===safeM&&val?' selected':''}>${v}</option>`;
   });
-  if(!oM) oM='<option value="00">00</option>';
-  const minValAttr=minTotMin>0?` data-min-val="${minTotMin}"`:'';
-  return `<div class="ts-wrap" data-cb="${key}"${minValAttr} style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="_tsChange(this,true)">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="_tsChange(this,false)">${oM}</select></div>`;
+  return `<div class="ts-wrap" data-cb="${key}" style="display:flex;gap:4px;${style}"><select class="fc tshh" style="flex:1;min-width:0;padding:11px 6px" onchange="_tsChange(this,true)">${oH}</select><select class="fc tsmm" style="width:62px;padding:11px 6px" onchange="_tsChange(this,false)">${oM}</select></div>`;
 }
 
 function tSel(val,onch,style=''){
@@ -1446,7 +1421,7 @@ function eliminaRT(id){
 // ══════════════════════════════════════
 const genRT=()=>{const d=new Date();return 'RT_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false,tipoIntervento:''});
+const makeG=()=>({data:today(),lavDa:'',lavA:'',oreLav:0,oreViag:0,pausaPranzo:0,pausaCena:0,vAnDa:'',vAnA:'',vRetDa:'',vRetA:'',km:0,pranzo:false,cena:false,pernotto:false});
 
 function nuovoRT(){
   isMod=false;isPr=false;lang='IT';
@@ -1866,7 +1841,7 @@ function renderSessioniTA(){
         </div>
         <div class="fg" style="margin:0">
           <label class="fl">Fine</label>
-          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`,'',s.inizio||'')}
+          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`)}
         </div>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -1920,7 +1895,7 @@ function initStd(){
   cRT.pacchetto=contr.pacchetto||'Spot';
   cRT.saldoPrima=contr.saldoOre||0;
   // Propaga pacchetto su tutte le giornate esistenti
-  gio.forEach(g=>{ if(!g.pacchetto) g.pacchetto=cRT.pacchetto; g.tipoIntervento=cRT.tipo||''; });
+  gio.forEach(g=>{ if(!g.pacchetto) g.pacchetto=cRT.pacchetto; });
 }
 
 // Quando si cambia il tipo intervento in scrDati, aggiorna la label del bottone avanti
@@ -2186,7 +2161,6 @@ function addG(){
   }
   g._open=true;
   g.pacchetto=cRT.pacchetto||'';
-  g.tipoIntervento=cRT.tipo||'';
   gio.forEach(x=>x._open=false);
   gio.push(g);
   renderGio();
@@ -2248,10 +2222,7 @@ function setupCanvas(id, key, onEndExtra){
   // Ricarica immagine salvata se presente (per Config)
   if(key==='cfg'&&db.config.firmaSalvata){
     const img=new Image();
-    img.onload=()=>{
-      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
-      ctx.drawImage(img,0,0,cv.width,cv.height);
-    };
+    img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);
     img.src=db.config.firmaSalvata;
     const ph=document.getElementById('phCfg');
     if(ph) ph.style.display='none';
@@ -2288,9 +2259,7 @@ function setupCfgF(){
       cv.ontouchmove=e=>{e.preventDefault();dr('cfg',e.touches[0]);};
       cv.ontouchend=()=>{ed('cfg');};
       if(db.config.firmaSalvata){
-        const img=new Image();
-        img.onload=()=>{ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0,cv.width,cv.height);};
-        img.src=db.config.firmaSalvata;
+        const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);img.src=db.config.firmaSalvata;
         const ph=document.getElementById('phCfg');if(ph)ph.style.display='none';
       }
     });
@@ -2383,70 +2352,35 @@ async function testFirmaSP(){
   }catch(e){out('ERRORE:',e.message);}
 }
 
-async function salvaCfgF(){
-  // Log persistente — scritto PRIMA di renderCfg per non perderlo
-  const log=document.getElementById('firmaSPLog');
-  const _msgs=[];
-  const out=s=>{
-    _msgs.push(s);
-    console.log('[salvaCfgF]',s);
-    if(log) log.textContent='=== SALVA FIRMA ===\n'+_msgs.join('\n');
-  };
-  if(log) log.textContent='=== SALVA FIRMA ===\n';
-
-  if(!FC['cfg']?.cv){
-    out('STOP: FC[cfg] non inizializzato — premi ↺ Attiva poi ridisegna');
-    toast('⚠️ Canvas non pronto — premi ↺ Attiva','err',6000);
-    return;
-  }
-  const firma=FC['cfg'].cv.toDataURL('image/png');
-  out('firmaDim: '+Math.round(firma.length/1024)+'KB');
+function salvaCfgF(){
+  if(!FC['cfg']?.cv)return;
+  const firma=FC['cfg'].cv.toDataURL();
   db.config.firmaSalvata=firma;
   saveDB();
   toast('✓ Firma salvata in locale','suc');
-  // Non chiamare renderCfg() qui — resetterebbe FC['cfg'] via setTimeout
-
-  // Stato M365
-  out('m365Token: '+(m365Token?'presente':'null'));
-  out('m365User: '+(m365User?.displayName||'null'));
-  out('_account: '+(m365User?._account?'presente':'null'));
-
-  // Token aggiornato
-  let tok=null;
-  try{
-    tok=await m365GetToken();
-    out('m365GetToken(): '+(tok?'ok ('+tok.length+'c)':'null'));
-  }catch(e){
-    out('m365GetToken() ERR: '+e.message);
-  }
-  if(!tok){
-    out('STOP: nessun token — firma solo locale');
-    toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
-    renderCfg();
-    return;
-  }
-  toast('☁️ Invio firma su SP...','wrn');
-  out('→ spSalvaFirmaTecnico...');
-  try{
-    await spSalvaFirmaTecnico(firma);
-    out('✓ Firma salvata su SP');
-    toast('☁️ Firma sincronizzata su SP','suc',5000);
-  }catch(e){
-    out('ERRORE SP: '+e.message);
-    console.error('SP firma error:',e);
-    toast('⚠️ '+e.message,'err',8000);
-  }
   renderCfg();
+  // Salva su SP
+  if(m365Token){
+    toast('☁️ Invio firma su SP...','wrn');
+    spSalvaFirmaTecnico(firma)
+      .then(()=>toast('☁️ Firma sincronizzata su SP','suc',5000))
+      .catch(e=>{
+        console.error('SP firma error:',e);
+        toast('⚠️ Firma non salvata su SP: '+e.message,'err',8000);
+      });
+  } else {
+    toast('⚠️ Non connesso a M365 — firma solo in locale','wrn',5000);
+  }
 }
 
 function getFT(){
   if(usaSalvata&&db.config.firmaSalvata)return db.config.firmaSalvata;
-  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL('image/png');
+  if(fSt.tec&&FC['tec']?.cv)return FC['tec'].cv.toDataURL();
   // Fallback: se c'è firma salvata usala anche se non esplicitamente selezionata
   if(db.config.firmaSalvata)return db.config.firmaSalvata;
   return '';
 }
-function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL('image/png');return '';}
+function getFC(){if(fSt.cli&&FC['cli']?.cv)return FC['cli'].cv.toDataURL();return '';}
 
 // ══════════════════════════════════════
 // BUILD PDF HTML (A4 794px wide)
@@ -2638,14 +2572,6 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA ${cliObj.piva}`:'')).trim();
   const dateStr=rt.dataCreazione?new Date(rt.dataCreazione).toLocaleDateString('it-IT'):'';
   const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
-  const _pac=rt.pacchetto||'Spot';
-  const _saldoP=rt.saldoPrima||0;
-  const boxPacchetto=(_pac&&_pac!=='Spot')
-    ?'<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">'
-      +'<span><b>'+(_pac==='IT'?'Pacchetto':'Pacchetto')+':</b> '+_pac+'</span>'
-      +'<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_saldoP+' h</span>'
-      +'</div>'
-    :'';
 
   // Righe tabella: Inizio Lav / Fine Lav / P.Pranzo / P.Cena / Ore Tot / Pranzo / Cena / Pernotto / Ore Viag / KM
   const rows=gd.map(g=>{
@@ -2700,7 +2626,16 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
     </div>
 
     <!-- PACCHETTO (se non Spot) -->
-    ${boxPacchetto}
+    \${(()=>{
+      const pac=rt.pacchetto||'Spot';
+      const saldoP=rt.saldoPrima||0;
+      const isSpot=!pac||pac==='Spot';
+      if(!isSpot) return \`<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">
+        <span><b>\${l==='IT'?'Pacchetto':'Package'}:</b> \${pac}</span>
+        <span><b>\${l==='IT'?'Saldo iniziale':'Opening balance'}:</b> \${saldoP} h</span>
+      </div>\`;
+      return '';
+    })()}
     <!-- TABELLA ORARIO -->
     <div class="pdf-sec">${L.wh}:</div>
     <table class="pdf-tbl">
@@ -2754,8 +2689,8 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
 // RENDER PREVIEW (scaled for mobile)
 // ══════════════════════════════════════
 function renderPreview(containerId){
-  const fT=fSt.tec?(usaSalvata?db.config.firmaSalvata:FC['tec']?.cv?.toDataURL('image/png')||''):'';
-  const fC=fSt.cli?FC['cli']?.cv?.toDataURL('image/png')||'':'';
+  const fT=fSt.tec?(usaSalvata?db.config.firmaSalvata:FC['tec']?.cv?.toDataURL()||''):'';
+  const fC=fSt.cli?FC['cli']?.cv?.toDataURL()||'':'';
   const html=buildPDFHTML(cRT,gio,fT,fC,isPr,lang);
   const container=document.getElementById(containerId);
   const mobileW=Math.min(window.innerWidth-30,750);
@@ -3097,7 +3032,7 @@ async function salva(invia){
 async function inviaEmailViaPA(rt, toList){
   const btnEl=document.querySelector('#scrFirma .btn.bsend, #scrDet .btn.bsend');
   if(btnEl){btnEl.disabled=true;btnEl.textContent='⏳ Invio...';}
-  toast('⏳ Caricamento su SharePoint...','wrn');
+  toast('⏳ Generazione PDF...','wrn');
 
   try{
     // 1. Verifica autenticazione M365
@@ -3105,38 +3040,30 @@ async function inviaEmailViaPA(rt, toList){
       throw new Error('Accedi a M365 prima di inviare (Config → Microsoft 365)');
     }
 
-    // 2. Genera HTML del rapportino
+    // 2. Genera PDF con jsPDF+html2canvas (stesso engine di scaricaPDF — logo e layout garantiti)
     const fT=rt.firmaTec||'';
     const fC=rt.firmaCli||'';
-    // Genera HTML per PA - usa font di sistema, rimuove ogni traccia di Google Fonts
-    let htmlContent=getPDFStyles(true)+buildPDFHTML(rt,rt.giornate||[],fT,fC,rt.isPrelim||false,rt.lang||'IT');
-    // Sanitizza per Word Online renderer (ignora CSS, usa solo stili inline)
-    htmlContent=htmlContent.replace(/@import[^;]+googleapis[^;]+;/g,'');
-    htmlContent=htmlContent.replace(/font-family\s*:\s*['"]?Barlow[^;}"']*['"]?/gi,"font-family:Calibri,'Segoe UI',Arial,sans-serif");
-    // Word Online ignora <style> - inietta font-family inline su tutti gli elementi
-    const WFONT="font-family:Calibri,'Segoe UI',Arial,sans-serif;";
-    // Aggiungi style inline su <body>
-    htmlContent=htmlContent.replace(/<body([^>]*)>/i,(m,attrs)=>{
-      if(attrs.includes('font-family')) return m;
-      return `<body${attrs} style="${WFONT}">`;
+    const pdfBlob=await generatePDFBlob(rt,rt.giornate||[],fT,fC);
+    if(!pdfBlob) throw new Error('Errore generazione PDF — riprova');
+
+    // Converte blob → base64: PA lo allega direttamente senza riconvertire HTML
+    const pdfBase64=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result.split(',')[1]);
+      reader.onerror=()=>reject(new Error('Errore lettura blob PDF'));
+      reader.readAsDataURL(pdfBlob);
     });
-    // Aggiungi/integra font su <td>, <th>, <p>, <div>, <span>, <strong>
-    htmlContent=htmlContent.replace(/<(td|th|p|div|span|strong|b)(\s[^>]*)?>/gi,(m,tag,attrs='')=>{
-      attrs=attrs||'';
-      const styleM=attrs.match(/style=["']([^"']*)["']/i);
-      if(styleM){
-        if(styleM[1].includes('font-family')) return m;
-        const newStyle=styleM[1]+';'+WFONT;
-        return m.replace(/style=["'][^"']*["']/i,`style="${newStyle}"`);
-      }
-      return `<${tag}${attrs} style="${WFONT}">`;
-    });
+
+    toast('⏳ Caricamento su SharePoint...','wrn');
+
     const dataRT=rt.giornate?.[0]?.data||rt.dataCreazione?.split('T')[0]||new Date().toISOString().split('T')[0];
+    const nomeFile=(rt.isPrelim?rt.numRT+'_Pre':rt.numRT)||('RT_'+Date.now());
 
     // 3. Costruisce il payload JSON per PA
     const queuePayload=JSON.stringify({
-      htmlInput:     htmlContent,
-      IDRapportino:  (rt.isPrelim?rt.numRT+'_Pre':rt.numRT)||'',
+      pdfBase64:     pdfBase64,
+      pdfFileName:   nomeFile+'.pdf',
+      IDRapportino:  nomeFile,
       RagioneSociale:rt.cliente||'',
       DataRT:        dataRT,
       EmailCliente:  toList.join(';')
@@ -3265,18 +3192,8 @@ ${serviceEmail}`;
 // ══════════════════════════════════════
 // DETTAGLIO
 // ══════════════════════════════════════
-async function openDet(id){
+function openDet(id){
   const rt=db.rapportini.find(r=>r.id===id);if(!rt)return;
-  // Carica firma tecnico da SP se non presente localmente
-  // Usa sempre la firma locale salvata (più aggiornata e in formato corretto)
-  // Sovrascrive rt.firmaTec che potrebbe essere JPEG nero da versioni precedenti
-  if(db.config.firmaSalvata){
-    rt.firmaTec=db.config.firmaSalvata;
-  } else if(!rt.firmaTec){
-    // Nessuna firma locale — prova a caricare da SP
-    await spLoadFirmaTecnico();
-    if(db.config.firmaSalvata) rt.firmaTec=db.config.firmaSalvata;
-  }
   cDet=rt;
   const mobileW=Math.min(window.innerWidth-30,750);
   const scale=mobileW/750;
@@ -3298,18 +3215,12 @@ async function openDet(id){
   showScr('scrDet');
 }
 function modRT(){
-  // Firma cliente solo locale — avvisa se presente prima di modificare
-  if(cDet.firmaCli){
-    if(!confirm('⚠️ Attenzione\n\nModificando il rapportino la firma del cliente verrà rimossa.\n\nAssicurati di aver già salvato/inviato il PDF firmato.\n\nProcedere?')) return;
-  }
   isMod=true;cRT={...cDet};
-  // Azzera firma cliente: non persiste dopo una modifica
-  cRT.firmaCli='';
   gio=cRT.giornate?cRT.giornate.map(g=>({...g})):[makeG()];
   // Ripristina chiamate telefonica
   telChiamate=(cRT.chiamate||[]).map(c=>({...c}));
   taSessioni=(cRT.sessioni||[]).map(s=>({...s}));
-  fotos=[];fSt={tec:!!cRT.firmaTec,cli:false};
+  fotos=[];fSt={tec:!!cRT.firmaTec,cli:!!cRT.firmaCli};
   lang=cRT.lang||'EN';isPr=cRT.isPrelim||false;
   selTec=cRT.tecnici?cRT.tecnici.split(', ').filter(Boolean):[];
   populateDDs();goStep(1);
@@ -3321,11 +3232,7 @@ function delRT(){
   saveDB();toast('Eliminato','wrn');goHome();renderHome();
 }
 function inviaEmail(){inviaEmailRT(cDet);}
-async function scaricaPDF(){
-  // Usa sempre firma locale aggiornata se disponibile
-  if(db.config.firmaSalvata) cDet.firmaTec=db.config.firmaSalvata;
-  generatePDF(cDet,cDet.giornate||[],cDet.firmaTec||'',cDet.firmaCli||'');
-}
+function scaricaPDF(){generatePDF(cDet,cDet.giornate||[],cDet.firmaTec||'',cDet.firmaCli||'');}
 
 // ══════════════════════════════════════
 // CLIENTI
@@ -4071,12 +3978,12 @@ function spItemToRT(item){
     }
   }catch(e){}
   let sessioni=[];
-  let ta_oreUsateSP=0;
   try{
     if(f.SessioniJSON){
       const raw=JSON.parse(f.SessioniJSON);
+      // Nuovo formato: {pacchetto, oreAddebitare, oreEffettive, sessioni:[]}
+      // Vecchio formato: array puro
       sessioni=Array.isArray(raw)?raw:(raw.sessioni||[]);
-      ta_oreUsateSP=parseFloat(raw.oreUsate??raw.oreAddebitare??0)||0;
     }
   }catch(e){}
 
@@ -4100,7 +4007,7 @@ function spItemToRT(item){
 
   // ta_oreUsate: usa oreDA se disponibile, altrimenti OreLavoro (campo numerico SP)
   const ta_oreUsate=isTelAss
-    ? (ta_oreUsateSP||oreDA||parseFloat(f.OreLavoro||0))
+    ? (oreDA||parseFloat(f.OreLavoro||0))
     : 0;
 
   return {
@@ -4123,8 +4030,8 @@ function spItemToRT(item){
     dataIntervento: f.DataIntervento?.split('T')[0]||'',
     giornate,
     fotoCount:    parseInt(f.NumFoto||0),
-    firmaTec:     '',   // caricata da AnymaTecnici on-demand
-    firmaCli:     '',    // solo locale, non persistita su SP
+    firmaTec:     '',
+    firmaCli:     '',
     odPdfUrl:     f.PDFUrl||'',
     // Telefonica
     tipoServizio,
@@ -4179,6 +4086,7 @@ function rtToSPFields(rt){
     Preliminare:    rt.isPrelim||false,
     Archiviato:     rt._archiviato||false,
     PDFUrl:         rt.odPdfUrl||'',
+    NumFoto:        rt.fotoCount||0,
     // Telefonica
     TipoServizio:   rt.tipoServizio||'Standard',
     Pacchetto:      rt.pacchetto||'',
@@ -4186,6 +4094,7 @@ function rtToSPFields(rt){
     MinutiEffettivi: rt.minutiEffettivi||0,
     OreEffettive:    rt.oreEffettive||0,
     SaldoPrima:     rt.saldoPrima||0,
+    SaldoDopo:      rt.saldoDopo||0,
     ChiamateJSON:   JSON.stringify({
       pacchetto:       rt.pacchetto||'Spot',
       minutiUsati:     rt.minutiUsati||0,
@@ -4194,7 +4103,7 @@ function rtToSPFields(rt){
     }),
     SessioniJSON:   JSON.stringify({
       pacchetto:      rt.pacchetto||'Spot',
-      oreUsate:       rt.ta_oreUsate||0,
+      oreAddebitare:  rt.ta_oreUsate||0,
       oreEffettive:   rt.oreEffettive||0,
       sessioni:       rt.sessioni||[]
     }),
@@ -4548,82 +4457,68 @@ async function spGetTecListId(){
 
 // Carica firma tecnico da SP (chiamata al login/sync)
 async function spLoadFirmaTecnico(){
-  // Ottieni token aggiornato — non usare m365Token direttamente (può essere scaduto)
-  let tok=null;
-  try{ tok=await m365GetToken(); }catch(e){}
-  if(!tok) return;
+  if(!m365Token) return;
   const email=getM365Email();
   if(!email){console.warn('spLoadFirmaTecnico: email non disponibile');return;}
   const sid=await spGetSiteId();
+  const tok=await m365GetToken();
   const listId=await spGetTecListId();
-  if(!listId) return;
+  if(!listId||!tok) return;
   try{
     const r=await fetch(
-      `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=50`,
+      `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$filter=fields/Title eq '${encodeURIComponent(email)}'&$top=1`,
       {headers:{Authorization:`Bearer ${tok}`}}
     );
-    if(!r.ok){console.warn('spLoadFirmaTecnico HTTP',r.status);return;}
     const d=await r.json();
-    const match=d.value?.find(it=>(it.fields?.Title||'').toLowerCase()===email.toLowerCase());
-    const firma=match?.fields?.FirmaBase64;
+    const firma=d.value?.[0]?.fields?.FirmaBase64;
     if(firma&&firma.length>100){
       db.config.firmaSalvata=firma;
       saveDB();
+      // Aggiorna UI se la firma era già mostrata
       const img=document.getElementById('savedFirmaImg');
       if(img) img.src=firma;
       console.log('Firma tecnico caricata da SP');
-    } else {
-      console.log('spLoadFirmaTecnico: nessuna firma trovata per',email,'— items:',d.value?.length);
     }
   }catch(e){console.warn('spLoadFirmaTecnico error',e);}
 }
 
 // Salva firma tecnico su SP
 async function spSalvaFirmaTecnico(firmaB64){
-  // Ottieni token aggiornato (può fare refresh silenzioso MSAL)
-  const tok=await m365GetToken();
-  if(!tok) throw new Error('Nessun token M365 — rieffettua login');
+  if(!m365Token) throw new Error('Nessun token M365');
   const email=getM365Email();
   if(!email) throw new Error('Impossibile determinare email account — rieffettua login');
   if(!firmaB64) throw new Error('Firma vuota');
   const sid=await spGetSiteId();
+  const tok=await m365GetToken();
   const listId=await spGetTecListId();
-  if(!listId) throw new Error('Lista AnymaTecnici non trovata su SP');
+  if(!listId) throw new Error('Lista AnymaTecnici non trovata/creata su SP');
+  if(!tok) throw new Error('Token SP non disponibile');
   console.log('spSalvaFirmaTecnico: listId=',listId,'email=',email);
-  // Log diagnostico
-  const _log=document.getElementById('firmaSPLog');
-  const _out=s=>{if(_log){_log.textContent+=s+'\n';}console.log('[spSalvaFirmaTecnico]',s);};
-  // Scarica tutti gli item (lista piccola, max ~10 tecnici) — evita $filter che SP rifiuta
-  const r=await fetch(
-    `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$top=50`,
-    {headers:{Authorization:`Bearer ${tok}`}}
-  );
-  if(!r.ok){const txt=await r.text();_out('ERR lista: '+r.status+' '+txt.substring(0,200));throw new Error('Errore lettura lista AnymaTecnici: '+r.status);}
-  const d=await r.json();
-  // Filtra lato client per email (case-insensitive)
-  const existing=d.value?.find(it=>
-    (it.fields?.Title||'').toLowerCase()===email.toLowerCase()
-  );
-  if(existing){
-    // Aggiorna item esistente
-    const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${existing.id}/fields`,{
-      method:'PATCH',
-      headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
-      body:JSON.stringify({FirmaBase64:firmaB64})
-    });
-    if(!r2.ok){const txt=await r2.text();throw new Error('Errore PATCH firma: '+r2.status+' '+txt.substring(0,200));}
-    _out('PATCH ok — item '+existing.id);
-  } else {
-    // Crea nuovo item
-    const r2=await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
-      body:JSON.stringify({fields:{Title:email,FirmaBase64:firmaB64}})
-    });
-    if(!r2.ok){const txt=await r2.text();throw new Error('Errore POST firma: '+r2.status+' '+txt.substring(0,200));}
-    _out('POST ok — nuovo item creato');
-  }
-  console.log('Firma tecnico salvata su SP');
+  try{
+    // Cerca item esistente
+    const r=await fetch(
+      `${GRAPH}/sites/${sid}/lists/${listId}/items?$expand=fields&$filter=fields/Title eq '${encodeURIComponent(email)}'&$top=1`,
+      {headers:{Authorization:`Bearer ${tok}`}}
+    );
+    const d=await r.json();
+    if(d.value?.length){
+      // Aggiorna item esistente
+      const itemId=d.value[0].id;
+      await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items/${itemId}/fields`,{
+        method:'PATCH',
+        headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+        body:JSON.stringify({FirmaBase64:firmaB64})
+      });
+    } else {
+      // Crea nuovo item
+      await fetch(`${GRAPH}/sites/${sid}/lists/${listId}/items`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+        body:JSON.stringify({fields:{Title:email,FirmaBase64:firmaB64}})
+      });
+    }
+    console.log('Firma tecnico salvata su SP');
+  }catch(e){console.warn('spSalvaFirmaTecnico error',e);}
 }
 
 // ── Carica silenzioso (per autoSync) ──
