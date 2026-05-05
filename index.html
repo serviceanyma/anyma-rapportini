@@ -1049,7 +1049,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v156';
+const APP_VERSION='v157';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -4953,36 +4953,36 @@ function renderDash(){
 
   document.getElementById('dashKPI').innerHTML=`
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${totRt}</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${totRt}</div>
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Rapportini</div>
     </div>
     <div class="card" style="border-left:3px solid var(--ok);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${totOreInLoco.toFixed(1)}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore in loco</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${totOreInLoco.toFixed(1)}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore in loco</div>
     </div>
     <div class="card" style="border-left:3px solid var(--warn);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--warn)">${totKm}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">KM totali</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--warn)">${totKm}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">KM totali</div>
     </div>
     <div class="card" style="border-left:3px solid #8b5cf6;padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#a78bfa">${totViag.toFixed(1)}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore viaggio</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#a78bfa">${totViag.toFixed(1)}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore viaggio</div>
     </div>
     <div class="card" style="border-left:3px solid var(--ok);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${inviati}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Inviati</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${inviati}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Inviati</div>
     </div>
     <div class="card" style="border-left:3px solid #06b6d4;padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totOreTeleass.toFixed(1)}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore teleass.</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totOreTeleass.toFixed(1)}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore teleass.</div>
     </div>
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${clientiUnici}</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Clienti</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--cr2)">${clientiUnici}</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Clienti</div>
     </div>
     <div class="card" style="border-left:3px solid #f97316;padding:12px">
-      <div style="font-size:24px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#f97316">${totMinTel}'</div>
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Min. telefonica</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#f97316">${totMinTel}'</div>
+      <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Min. telefonica</div>
     </div>`;
 
   _dashList=list; // salva per mostraCliDetail
@@ -5007,16 +5007,16 @@ function renderDash(){
   const rows=Object.values(byClient).sort((a,b)=>b.ore-a.ore);
   if(rows.length){
     document.getElementById('dashTabCli').innerHTML=`
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:340px">
         <thead>
           <tr style="border-bottom:2px solid var(--cr)">
-            <th style="text-align:left;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">CLIENTE</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">RT</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#2ecc71;font-weight:700;letter-spacing:.5px">ORE LOCO</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#a78bfa;font-weight:700;letter-spacing:.5px">ORE VIAG.</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#06b6d4;font-weight:700;letter-spacing:.5px">ORE TELEASS.</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:#f97316;font-weight:700;letter-spacing:.5px">MIN TEL.</th>
-            <th style="text-align:center;padding:6px 4px;font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px">INV.</th>
+            <th style="text-align:left;padding:6px 4px;font-size:11px;color:var(--tx3);font-weight:700;letter-spacing:.5px">CLIENTE</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:var(--tx3);font-weight:700;letter-spacing:.5px">RT</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:#2ecc71;font-weight:700;letter-spacing:.5px">ORE LOCO</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:#a78bfa;font-weight:700;letter-spacing:.5px">ORE VIAG.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:#06b6d4;font-weight:700;letter-spacing:.5px">ORE TELEASS.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:#f97316;font-weight:700;letter-spacing:.5px">MIN TEL.</th>
+            <th style="text-align:center;padding:6px 4px;font-size:11px;color:var(--tx3);font-weight:700;letter-spacing:.5px">INV.</th>
           </tr>
         </thead>
         <tbody>
@@ -5083,6 +5083,7 @@ function mostraCliDetail(nomeCli){
     const isTel=isTelFonRT(r);
     const isTelAs=isTeleassRT(r);
     const oreLav=isTel?0:getOreLav(r);
+    const oreTa=isTelAs?getOreLav(r):0;
     let viag=0,km=0;
     (r.giornate||[]).forEach(g=>{
       viag+=parseFloat(g.oreViag||0);
@@ -5099,10 +5100,11 @@ function mostraCliDetail(nomeCli){
       numRT:r.numRT||r.id||'—',
       data:r.dataIntervento||r.dataCreazione?.split('T')[0]||'—',
       tipo:r.tipo||'—',
-      oreLav:isTel?'—':oreLav.toFixed(1),
+      oreLav:(isTel||isTelAs)?'—':oreLav.toFixed(1),
       viag:isTel?'—':viag.toFixed(1),
       km:isTel?'—':km,
-      pause:isTel?'—':pauseStr,
+      pause:(isTel||isTelAs)?'—':pauseStr,
+      oreTa:isTelAs?oreTa.toFixed(1):'—',
       minTel:isTel?getMinTelR(r):null,
       stato:r.stato||'—'
     };
@@ -5111,34 +5113,49 @@ function mostraCliDetail(nomeCli){
   const totOreLav=detRows.reduce((s,r)=>s+(r.oreLav!=='—'?parseFloat(r.oreLav):0),0);
   const totViag=detRows.reduce((s,r)=>s+(r.viag!=='—'?parseFloat(r.viag):0),0);
   const totKm=detRows.reduce((s,r)=>s+(r.km!=='—'?parseInt(r.km):0),0);
+  const totOreTa=detRows.reduce((s,r)=>s+(r.oreTa!=='—'?parseFloat(r.oreTa):0),0);
 
   tbl.innerHTML=`
-    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:480px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
+      <colgroup>
+        <col style="width:90px">
+        <col style="width:80px">
+        <col style="width:140px">
+        <col style="width:70px">
+        <col style="width:70px">
+        <col style="width:50px">
+        <col style="width:100px">
+        <col style="width:75px">
+        <col style="width:60px">
+        <col style="width:60px">
+      </colgroup>
       <thead>
         <tr style="border-bottom:2px solid var(--cr)">
-          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3);letter-spacing:.5px">N° RT</th>
-          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">DATA</th>
-          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">TIPO</th>
-          <th style="text-align:center;padding:5px 4px;font-size:10px;color:#2ecc71">ORE LAV.</th>
-          <th style="text-align:center;padding:5px 4px;font-size:10px;color:#a78bfa">ORE VIAG.</th>
-          <th style="text-align:center;padding:5px 4px;font-size:10px;color:var(--warn)">KM</th>
-          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">PAUSE</th>
-          <th style="text-align:center;padding:5px 4px;font-size:10px;color:#f97316">MIN TEL.</th>
-          <th style="text-align:center;padding:5px 4px;font-size:10px;color:var(--tx3)">STATO</th>
+          <th style="text-align:left;padding:5px 4px;font-size:11px;color:var(--tx3);letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">N° RT</th>
+          <th style="text-align:left;padding:5px 4px;font-size:11px;color:var(--tx3);white-space:nowrap">DATA</th>
+          <th style="text-align:left;padding:5px 4px;font-size:11px;color:var(--tx3);white-space:nowrap">TIPO</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:#2ecc71;white-space:nowrap">ORE LAV.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:#a78bfa;white-space:nowrap">ORE VIAG.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:var(--warn);white-space:nowrap">KM</th>
+          <th style="text-align:left;padding:5px 4px;font-size:11px;color:var(--tx3);white-space:nowrap">PAUSE</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:#06b6d4;white-space:nowrap">ORE TA.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:#f97316;white-space:nowrap">MIN TEL.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:11px;color:var(--tx3);white-space:nowrap">STATO</th>
         </tr>
       </thead>
       <tbody>
         ${detRows.map((r,i)=>`
           <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''}">
-            <td style="padding:6px 4px;color:var(--cr2);font-weight:700">${r.numRT}</td>
-            <td style="padding:6px 4px;color:var(--tx)">${r.data}</td>
-            <td style="padding:6px 4px;color:var(--tx2)">${r.tipo}</td>
+            <td style="padding:6px 4px;color:var(--cr2);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.numRT}</td>
+            <td style="padding:6px 4px;color:var(--tx);white-space:nowrap">${r.data}</td>
+            <td style="padding:6px 4px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.tipo}</td>
             <td style="text-align:center;padding:6px 4px;color:#2ecc71;font-weight:700">${r.oreLav}</td>
             <td style="text-align:center;padding:6px 4px;color:#a78bfa">${r.viag}</td>
             <td style="text-align:center;padding:6px 4px;color:var(--warn)">${r.km}</td>
-            <td style="padding:6px 4px;color:var(--tx3);font-size:10px">${r.pause}</td>
+            <td style="padding:6px 4px;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.pause}</td>
+            <td style="text-align:center;padding:6px 4px;color:#06b6d4">${r.oreTa}</td>
             <td style="text-align:center;padding:6px 4px;color:#f97316">${r.minTel!=null?r.minTel+"'":'—'}</td>
-            <td style="text-align:center;padding:6px 4px;color:var(--tx2);font-size:10px">${r.stato}</td>
+            <td style="text-align:center;padding:6px 4px;color:var(--tx2)">${r.stato}</td>
           </tr>`).join('')}
       </tbody>
       <tfoot>
@@ -5147,7 +5164,10 @@ function mostraCliDetail(nomeCli){
           <td style="text-align:center;padding:6px 4px;color:#2ecc71">${totOreLav.toFixed(1)}</td>
           <td style="text-align:center;padding:6px 4px;color:#a78bfa">${totViag.toFixed(1)}</td>
           <td style="text-align:center;padding:6px 4px;color:var(--warn)">${totKm}</td>
-          <td colspan="3"></td>
+          <td></td>
+          <td style="text-align:center;padding:6px 4px;color:#06b6d4">${totOreTa.toFixed(1)}</td>
+          <td></td>
+          <td></td>
         </tr>
       </tfoot>
     </table>`;
