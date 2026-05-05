@@ -897,6 +897,8 @@ ${fontImport}
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Ore per cliente</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:6px;letter-spacing:.4px">Clicca su un cliente nel riepilogo per vedere il dettaglio RT</div>
+    <div id="chartCliOreBox" style="margin-bottom:10px"></div>
     <canvas id="chartCliOre" height="80"></canvas>
   </div>
   <div class="card" style="margin-bottom:10px">
@@ -988,7 +990,7 @@ const T={
 
 // Traduzione tipi intervento IT→EN
 const TIPO_MAP={
-  'Supporto':'Support',
+  'Supporto / Assistenza':'Support / Assistance',
   'Manutenzione Ordinaria':'Routine Maintenance',
   'Manutenzione Straordinaria':'Extraordinary Maintenance',
   'Guasto / Emergenza':'Breakdown / Emergency',
@@ -1010,7 +1012,7 @@ function addTipoTranslation(it,en){if(!TIPO_MAP[it]) TIPO_MAP[it]=en;}
 let db={
   clienti:[],
   tecnici:['Daniel Consolaro','Nelvio Rigon'],
-  tipi:['Supporto','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Assistenza Telefonica','Formazione'],
+  tipi:['Supporto / Assistenza','Manutenzione Ordinaria','Manutenzione Straordinaria','Guasto / Emergenza','Installazione','Collaudo','Teleassistenza','Assistenza Telefonica','Formazione'],
   rapportini:[],
   config:{
     azienda:'',email:'',firmaSalvata:'',
@@ -1031,7 +1033,7 @@ const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
 })();
-const APP_VERSION='v153';
+const APP_VERSION='v154';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -5002,8 +5004,8 @@ function renderDash(){
         </thead>
         <tbody>
           ${rows.map((r,i)=>`
-            <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''}">
-              <td style="padding:7px 4px;font-weight:600;color:var(--tx)">${r.nome}</td>
+            <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''};cursor:pointer" onclick="showCliDetail('${r.nome}',_dashList)" title="Clicca per dettaglio RT">
+              <td style="padding:7px 4px;font-weight:600;color:var(--tx);text-decoration:underline dotted var(--cr)">${r.nome}</td>
               <td style="text-align:center;padding:7px 4px;color:var(--cr2);font-weight:700">${r.rt}</td>
               <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.oreLoco.toFixed(1)}</td>
               <td style="text-align:center;padding:7px 4px;color:#a78bfa">${r.viag.toFixed(1)}</td>
@@ -5028,13 +5030,107 @@ function renderDash(){
     document.getElementById('dashTabCli').innerHTML='<div style="font-size:12px;color:var(--tx3);padding:8px 0">Nessun dato per il periodo selezionato</div>';
   }
 
+  _dashList=list; // salva per dettaglio cliente
   // ── Grafici ──
   renderDashCharts(list);
 }
 
+let _dashList=[]; // lista RT corrente dashboard
 // Istanze Chart.js (per destroy prima di ri-creare)
 const _charts={};
 function destroyChart(id){if(_charts[id]){_charts[id].destroy();delete _charts[id];}}
+
+
+function showCliDetail(nomeCli, list){
+  // Filtra RT del cliente selezionato
+  const rts=(list||[]).filter(r=>r.cliente===nomeCli);
+  const box=document.getElementById('chartCliOreBox');
+  if(!box) return;
+  if(!rts.length){
+    box.innerHTML='<div style="font-size:12px;color:var(--tx3);padding:8px 0">Nessun rapportino trovato per '+nomeCli+'</div>';
+    box.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  const rows=rts.map(r=>{
+    const isTelAs=r.tipo==='Teleassistenza';
+    const isTelFon=isTelFonRT(r);
+    let oreLoco=0,viag=0,km=0,pause='';
+    if(isTelFon){
+      // telefonica
+    } else if(isTelAs){
+      oreLoco=getOreTA(r);
+      (r.giornate||[]).forEach(g=>{viag+=parseFloat(g.oreViag||0);});
+    } else {
+      oreLoco=getOreLoco(r);
+      (r.giornate||[]).forEach(g=>{
+        km+=parseInt(g.km||0);
+        viag+=parseFloat(g.oreViag||0);
+      });
+      // pause: somma pause pranzo e cena in minuti
+      let pp=0,pc=0;
+      (r.giornate||[]).forEach(g=>{
+        pp+=parseInt(g.pausaPranzo||0);
+        pc+=parseInt(g.pausaCena||0);
+      });
+      if(pp||pc) pause=(pp?'P.Pranzo:'+pp+'' ':'')+( pc?'P.Cena:'+pc+'''  :'');
+    }
+    return {
+      id:r.numRT||r.id||'—',
+      data:r.dataIntervento||r.dataCreazione||'—',
+      tipo:r.tipo||'—',
+      oreLoco:oreLoco.toFixed(1),
+      viag:viag.toFixed(1),
+      km:km,
+      pause:pause||'—',
+      stato:r.stato||'—'
+    };
+  });
+
+  box.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700;color:var(--tx)">${nomeCli}</div>
+      <button class="btn bgh bic bsm" onclick="document.getElementById('chartCliOreBox').innerHTML=''" style="font-size:10px;padding:4px 10px">✕ Chiudi</button>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:500px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--cr)">
+          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3);letter-spacing:.5px">N° RT</th>
+          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">DATA</th>
+          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">TIPO</th>
+          <th style="text-align:center;padding:5px 4px;font-size:10px;color:#2ecc71">ORE LAV.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:10px;color:#a78bfa">ORE VIAG.</th>
+          <th style="text-align:center;padding:5px 4px;font-size:10px;color:var(--warn)">KM</th>
+          <th style="text-align:left;padding:5px 4px;font-size:10px;color:var(--tx3)">PAUSE</th>
+          <th style="text-align:center;padding:5px 4px;font-size:10px;color:var(--tx3)">STATO</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r,i)=>`
+          <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''}">
+            <td style="padding:6px 4px;color:var(--cr2);font-weight:700">${r.id}</td>
+            <td style="padding:6px 4px;color:var(--tx)">${r.data}</td>
+            <td style="padding:6px 4px;color:var(--tx2)">${r.tipo}</td>
+            <td style="text-align:center;padding:6px 4px;color:#2ecc71;font-weight:700">${r.oreLoco}</td>
+            <td style="text-align:center;padding:6px 4px;color:#a78bfa">${r.viag}</td>
+            <td style="text-align:center;padding:6px 4px;color:var(--warn)">${r.km}</td>
+            <td style="padding:6px 4px;color:var(--tx3);font-size:10px">${r.pause}</td>
+            <td style="text-align:center;padding:6px 4px;color:var(--tx2);font-size:10px">${r.stato}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid var(--b2);font-weight:700">
+          <td colspan="3" style="padding:6px 4px;color:var(--tx2)">TOTALE (${rows.length} RT)</td>
+          <td style="text-align:center;padding:6px 4px;color:#2ecc71">${rows.reduce((s,r)=>s+parseFloat(r.oreLoco),0).toFixed(1)}</td>
+          <td style="text-align:center;padding:6px 4px;color:#a78bfa">${rows.reduce((s,r)=>s+parseFloat(r.viag),0).toFixed(1)}</td>
+          <td style="text-align:center;padding:6px 4px;color:var(--warn)">${rows.reduce((s,r)=>s+r.km,0)}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>`;
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 
 function renderDashCharts(list){
   // Palette colori
