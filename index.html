@@ -1036,11 +1036,20 @@ let db={
 };
 try{const s=localStorage.getItem('anyma_v14');if(s)db=JSON.parse(s);}catch(e){}
 const saveDB=()=>localStorage.setItem('anyma_v14',JSON.stringify(db));
+let _dashList=[]; // lista RT corrente per dettaglio cliente
 // Init: assicura db.contratti presente anche su DB esistenti
 (function migraDB(){
   if(!db.contratti) db.contratti=[];
+  // Migra 'Supporto' -> 'Supporto / Assistenza' nei tipi e nei rapportini esistenti
+  if(db.tipi){
+    db.tipi=db.tipi.map(t=>t==='Supporto'?'Supporto / Assistenza':t);
+    if(!db.tipi.includes('Supporto / Assistenza')) db.tipi.unshift('Supporto / Assistenza');
+  }
+  if(db.rapportini){
+    db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
+  }
 })();
-const APP_VERSION='v155';
+const APP_VERSION='v156';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -4976,6 +4985,7 @@ function renderDash(){
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Min. telefonica</div>
     </div>`;
 
+  _dashList=list; // salva per mostraCliDetail
   // ── TABELLA PER CLIENTE ──
   const byClient={};
   list.forEach(r=>{
@@ -5011,7 +5021,7 @@ function renderDash(){
         </thead>
         <tbody>
           ${rows.map((r,i)=>`
-            <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''};cursor:pointer" onclick="mostraCliDetail('${r.nome}',list)">
+            <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''};cursor:pointer" onclick="mostraCliDetail('${r.nome}')">
               <td style="padding:7px 4px;font-weight:600;color:var(--cr2);text-decoration:underline dotted">${r.nome}</td>
               <td style="text-align:center;padding:7px 4px;color:var(--cr2);font-weight:700">${r.rt}</td>
               <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.oreLoco.toFixed(1)}</td>
@@ -5042,9 +5052,10 @@ function renderDash(){
 }
 
 // ── Dettaglio RT per cliente (click dal riepilogo dashboard) ──
-function mostraCliDetail(nomeCli, list){
+function mostraCliDetail(nomeCli){
+  const list=_dashList||[];
   // filtra RT del cliente
-  const rts=(list||[]).filter(r=>r.cliente===nomeCli);
+  const rts=list.filter(r=>r.cliente===nomeCli);
   const card=document.getElementById('cardCliDetail');
   const title=document.getElementById('cliDetailTitle');
   const tbl=document.getElementById('cliDetailTable');
