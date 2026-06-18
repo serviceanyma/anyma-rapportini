@@ -541,16 +541,11 @@ ${fontImport}
         </div>
       </div>
     </div>
-    <!-- Data sessione -->
-    <div class="fg" style="margin-bottom:10px">
-      <label class="fl">Data sessione</label>
-      <input type="date" class="fc" id="taData" onchange="cRT.ta_data=this.value">
-    </div>
-    <!-- Lista sessioni -->
+    <!-- Lista giornate + sessioni -->
     <div id="taSessioniList"></div>
-    <button class="btn bgh bfl bsm" onclick="addSessioneTA()" style="margin-bottom:10px">
+    <button class="btn bgh bfl bsm" onclick="addGiornataTA()" style="margin-bottom:10px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Aggiungi sessione
+      Aggiungi data
     </button>
     <!-- Totali -->
     <div class="card" style="margin-bottom:10px;background:var(--s2)">
@@ -1049,7 +1044,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v157';
+const APP_VERSION='v158';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1446,7 +1441,7 @@ function nuovoRT(){
   // Preselect only the logged-in user
   selTec=m365User?.displayName?[m365User.displayName]:[];
   gio=[makeG()];fotos=[];fSt={tec:false,cli:false};usaSalvata=false;
-  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),dataIntervento:'',tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:'',sessioni:[],ta_data:'',ta_minutiUsati:0,ta_oreUsate:0,ta_saldoDopo:null};
+  cRT={id:Date.now().toString(),numRT:genRT(),cliente:'',clienteAddr:'',clienteEmail:'',clienteTel:'',tecnici:'',tipo:'',attivita:'',stato:'Bozza',giornate:[],fotoCount:0,firmaTec:'',firmaCli:'',lang:'IT',isPrelim:false,dataCreazione:new Date().toISOString(),dataIntervento:'',tipoServizio:'Standard',pacchetto:'',minutiUsati:0,saldoPrima:0,saldoDopo:0,chiamate:[],chiamate_data:'',sessioni:[],taGiornate:[],ta_data:'',ta_minutiUsati:0,ta_oreUsate:0,ta_saldoDopo:null};
   populateDDs();
   document.getElementById('inRT').value=cRT.numRT;
   document.getElementById('inAtt').value='';
@@ -1480,13 +1475,11 @@ function goStep(s){
     renderGio();showScr('scrGio');switchGioMode();
     // Ripristina date salvate nei campi input
     const _telD=document.getElementById('telData');
-    const _taD=document.getElementById('taData');
     if(_telD&&cRT.chiamate_data) _telD.value=cRT.chiamate_data;
-    if(_taD&&cRT.ta_data) _taD.value=cRT.ta_data;
   }else if(s===1){
     // Back to Dati — salva chiamate prima di uscire
     if(isTelefonica()) cRT.chiamate=telChiamate.map(c=>({...c}));
-    if(isTeleassistenza()) cRT.sessioni=taSessioni.map(s=>({...s}));
+    if(isTeleassistenza()){ cRT.taGiornate=taGiornate.map(g=>({data:g.data||'',sessioni:(g.sessioni||[]).map(s=>({...s}))})); cRT.sessioni=taFlatten(); }
     populateDDs();document.getElementById('inRT').value=cRT.numRT;
     const c=db.clienti.find(x=>x.nome===cRT.cliente);if(c)document.getElementById('inCli').value=c.id;
     document.getElementById('inEmail').value=cRT.clienteEmail||'';
@@ -1508,12 +1501,13 @@ function goStep(s){
       cRT.giornate=[{data:dataTel,lavDa:'',lavA:'',oreLav:parseFloat((totArr/60).toFixed(2)),oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}];
       cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
     } else if(isTeleassistenza()){
-      if(!taSessioni.length){toast('⚠️ Aggiungi almeno una sessione','err');return;}
-      const dataTA=document.getElementById('taData')?.value||today();
-      cRT.ta_data=dataTA;
-      cRT.sessioni=taSessioni.map(s=>({...s}));
-      const totOre=cRT.ta_oreUsate||0;
-      cRT.giornate=[{data:dataTA,lavDa:'',lavA:'',oreLav:totOre,oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}];
+      const _totSess=taGiornate.reduce((a,g)=>a+(g.sessioni||[]).length,0);
+      if(!_totSess){toast('⚠️ Aggiungi almeno una sessione','err');return;}
+      if(taGiornate.some(g=>!g.data)){toast('⚠️ Imposta la data di ogni giornata','err');return;}
+      cRT.taGiornate=taGiornate.map(g=>({data:g.data||'',sessioni:(g.sessioni||[]).map(s=>({...s}))}));
+      cRT.sessioni=taFlatten();
+      cRT.ta_data=taGiornate[0]?.data||today();
+      cRT.giornate=taGiornate.map(g=>({data:g.data||today(),lavDa:'',lavA:'',oreLav:parseFloat(((g.sessioni||[]).reduce((s,x)=>s+calcDurataMin(x.inizio,x.fine),0)/60).toFixed(2)),oreViag:0,km:0,pranzo:false,cena:false,pernotto:false}));
       cRT.foto=[];renderPreview('pdfPreviewBox');showScr('scrAnt');
     } else {
       const errs=valAll();
@@ -1737,17 +1731,41 @@ function renderChiamate(){
 
 const isTeleassistenza=()=>cRT&&cRT.tipo==='Teleassistenza';
 
-let taSessioni=[]; // sessioni correnti durante editing
+let taGiornate=[]; // giornate (con sessioni) correnti durante editing
+
+// Costruisce taGiornate da cRT (nuovo formato taGiornate o legacy sessioni piatto)
+function taGiornateFromRT(){
+  if(Array.isArray(cRT.taGiornate)&&cRT.taGiornate.length){
+    return cRT.taGiornate.map(g=>({data:g.data||'',sessioni:(g.sessioni||[]).map(s=>({...s}))}));
+  }
+  const flat=cRT.sessioni||[];
+  if(flat.length){
+    if(flat.some(s=>s.data)){
+      const map={},order=[];
+      flat.forEach(s=>{const d=s.data||cRT.ta_data||cRT.dataIntervento||today();if(!map[d]){map[d]=[];order.push(d);}map[d].push({...s});});
+      return order.map(d=>({data:d,sessioni:map[d]}));
+    }
+    return [{data:cRT.ta_data||cRT.dataIntervento||today(),sessioni:flat.map(s=>({...s}))}];
+  }
+  return [{data:cRT.ta_data||cRT.dataIntervento||today(),sessioni:[makeSessioneTA()]}];
+}
+// Appiattisce taGiornate in sessioni (con data) per PDF/recap/SP
+function taFlatten(){
+  const flat=[];
+  taGiornate.forEach(g=>(g.sessioni||[]).forEach(s=>flat.push({
+    inizio:s.inizio||'',fine:s.fine||'',referente:s.referente||'',
+    durata:calcDurataMin(s.inizio,s.fine),data:g.data||''
+  })));
+  return flat;
+}
 
 function initTeleassistenza(){
   const contr=getContratto(cRT.cliente,'Teleassistenza');
   cRT.pacchetto=contr.pacchetto;
   cRT.saldoPrima=contr.saldoOre||0;
   cRT.tipoServizio='Teleassistenza';
-  taSessioni=(cRT.sessioni||[]).slice();
-  const dataEl=document.getElementById('taData');
-  if(dataEl) dataEl.value=cRT.ta_data||today();
-  cRT.ta_data=cRT.ta_data||today();
+  taGiornate=taGiornateFromRT();
+  cRT.ta_data=cRT.ta_data||taGiornate[0]?.data||today();
   aggiornaTAInfo();
   renderSessioniTA();
 }
@@ -1768,11 +1786,11 @@ function aggiornaTotaliTA(){
   const contr=getContratto(cRT.cliente,'Teleassistenza');
   const pac=contr.pacchetto||'Spot';
   let totMin=0;
-  taSessioni.forEach(s=>{
+  taGiornate.forEach(g=>(g.sessioni||[]).forEach(s=>{
     const dur=calcDurataMin(s.inizio,s.fine);
     s.durata=dur;
     totMin+=dur;
-  });
+  }));
   // Nessun arrotondamento — solo consumo effettivo
   const totArr=totMin;
   const totOre=parseFloat((totArr/60).toFixed(2));
@@ -1796,79 +1814,104 @@ function aggiornaTotaliTA(){
 function makeSessioneTA(){
   return {inizio:'',fine:'',referente:'',durata:0};
 }
+function makeGiornataTA(){
+  return {data:'',sessioni:[makeSessioneTA()]};
+}
 
-function addSessioneTA(){
-  taSessioni.push(makeSessioneTA());
+function addGiornataTA(){
+  taGiornate.push(makeGiornataTA());
+  renderSessioniTA();
+}
+function delGiornataTA(gi){
+  taGiornate.splice(gi,1);
+  if(!taGiornate.length) taGiornate.push(makeGiornataTA());
+  renderSessioniTA();
+}
+function updGiornataData(gi,v){
+  if(taGiornate[gi]) taGiornate[gi].data=v;
+}
+
+function addSessioneTA(gi){
+  if(!taGiornate[gi].sessioni) taGiornate[gi].sessioni=[];
+  taGiornate[gi].sessioni.push(makeSessioneTA());
   renderSessioniTA();
 }
 
-function delSessioneTA(i){
-  taSessioni.splice(i,1);
+function delSessioneTA(gi,si){
+  taGiornate[gi].sessioni.splice(si,1);
   renderSessioniTA();
 }
 
-function updSessioneTA(i,f,v){
-  taSessioni[i][f]=v;
+function updSessioneTA(gi,si,f,v){
+  const s=taGiornate[gi].sessioni[si];
+  s[f]=v;
   // Se cambia inizio, resetta fine se non è almeno 30min dopo
-  if(f==='inizio'&&taSessioni[i].fine){
-    const durCheck=calcDurataMin(taSessioni[i].inizio,taSessioni[i].fine);
-    if(durCheck<30) taSessioni[i].fine='';
+  if(f==='inizio'&&s.fine){
+    if(calcDurataMin(s.inizio,s.fine)<30) s.fine='';
   }
-  const dur=calcDurataMin(taSessioni[i].inizio,taSessioni[i].fine);
-  taSessioni[i].durata=dur;
+  const dur=calcDurataMin(s.inizio,s.fine);
+  s.durata=dur;
   aggiornaTotaliTA();
-  const durEl=document.getElementById(`taDur_${i}`);
+  const durEl=document.getElementById(`taDur_${gi}_${si}`);
   if(durEl) durEl.textContent=dur>=60?(dur/60).toFixed(2)+' h':dur+' min';
   // Re-render per aggiornare opzioni select Fine
   if(f==='inizio') renderSessioniTA();
 }
 
-function updOreMinTA(i,campo,tipo,val){
-  const cur=taSessioni[i][campo]||'';
-  const parts=cur.split(':');
-  let hh=parts[0]||'';
-  let mm=parts[1]||'00';
-  if(tipo==='h') hh=val;
-  else mm=val;
-  const nuovo=hh?(hh+':'+mm):'';
-  updSessioneTA(i,campo,nuovo);
-}
-
 function renderSessioniTA(){
   const el=document.getElementById('taSessioniList');
   if(!el) return;
-  if(!taSessioni.length){
-    el.innerHTML=`<div style="color:var(--tx3);font-size:13px;text-align:center;padding:16px">Nessuna sessione — premi Aggiungi</div>`;
+  if(!taGiornate.length){
+    el.innerHTML=`<div style="color:var(--tx3);font-size:13px;text-align:center;padding:16px">Nessuna data — premi "Aggiungi data"</div>`;
     aggiornaTotaliTA();
     return;
   }
-  el.innerHTML=taSessioni.map((s,i)=>{
-    const dur=calcDurataMin(s.inizio,s.fine);
-    s.durata=dur;
-    return `<div class="gc" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">🖥 Sessione ${i+1}</span>
-        <button class="delbtn" onclick="delSessioneTA(${i})">
+  el.innerHTML=taGiornate.map((g,gi)=>{
+    const sess=(g.sessioni||[]).map((s,si)=>{
+      const dur=calcDurataMin(s.inizio,s.fine);
+      s.durata=dur;
+      return `<div class="gc" style="margin-bottom:8px;background:var(--s2)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">🖥 Sessione ${si+1}</span>
+          <button class="delbtn" onclick="delSessioneTA(${gi},${si})">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="fr c2" style="margin-bottom:8px">
+          <div class="fg" style="margin:0">
+            <label class="fl">Inizio</label>
+            ${tSelHHMM(s.inizio,`updSessioneTA(${gi},${si},'inizio',this.value)`)}
+          </div>
+          <div class="fg" style="margin:0">
+            <label class="fl">Fine</label>
+            ${tSelHHMM(s.fine,`updSessioneTA(${gi},${si},'fine',this.value)`)}
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:8px">
+          <label class="fl">Referente cliente</label>
+          <input type="text" class="fc" value="${s.referente||''}" placeholder="Nome cognome" onchange="updSessioneTA(${gi},${si},'referente',this.value)">
+        </div>
+        <div style="font-size:12px;color:var(--tx3)">
+          ⏱ Durata: <b id="taDur_${gi}_${si}" style="color:var(--tx)">${dur>=60?(dur/60).toFixed(2)+' h':dur+' min'}</b>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="gc" style="margin-bottom:12px;border-left:3px solid #06b6d4">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+        <span style="font-size:12px;font-weight:700;color:#22d3ee;text-transform:uppercase;letter-spacing:1px">📅 Giornata ${gi+1}</span>
+        <button class="delbtn" onclick="delGiornataTA(${gi})" title="Rimuovi giornata">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div class="fr c2" style="margin-bottom:8px">
-        <div class="fg" style="margin:0">
-          <label class="fl">Inizio</label>
-          ${tSelHHMM(s.inizio,`updSessioneTA(${i},'inizio',this.value)`)}
-        </div>
-        <div class="fg" style="margin:0">
-          <label class="fl">Fine</label>
-          ${tSelHHMM(s.fine,`updSessioneTA(${i},'fine',this.value)`)}
-        </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label class="fl">Data</label>
+        <input type="date" class="fc" value="${g.data||''}" onchange="updGiornataData(${gi},this.value)">
       </div>
-      <div class="fg" style="margin-bottom:8px">
-        <label class="fl">Referente cliente</label>
-        <input type="text" class="fc" value="${s.referente||''}" placeholder="Nome cognome" onchange="updSessioneTA(${i},'referente',this.value)">
-      </div>
-      <div style="font-size:12px;color:var(--tx3)">
-        ⏱ Durata: <b id="taDur_${i}" style="color:var(--tx)">${dur>=60?(dur/60).toFixed(2)+' h':dur+' min'}</b>
-      </div>
+      ${sess}
+      <button class="btn bgh bfl bsm" onclick="addSessioneTA(${gi})" style="margin-top:2px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi sessione
+      </button>
     </div>`;
   }).join('');
   aggiornaTotaliTA();
@@ -2496,20 +2539,21 @@ function buildPDFTeleassistenza(rt,fT,fC,prelim,l){
   const wm=prelim?`<div class="pdf-wm">${L.pr}</div>`:'';
   const saldoPrima=(pac==='Spot'||pac==='Premium')?null:(rt.saldoPrima||0);
   const saldoDopo=(pac==='Spot'||pac==='Premium')?null:(rt.ta_saldoDopo!==null&&rt.ta_saldoDopo!==undefined?rt.ta_saldoDopo:null);
-  const totMin=sessioni.reduce((s,x)=>s+(x.durata||calcDurataMin(x.inizio,x.fine)),0);
+  const _giorni=(rt.taGiornate&&rt.taGiornate.length)?rt.taGiornate:[{data:dataTA,sessioni:sessioni}];
+  const totMin=_giorni.reduce((a,g)=>a+(g.sessioni||[]).reduce((s,x)=>s+(x.durata||calcDurataMin(x.inizio,x.fine)),0),0);
   const totArr=totMin; // nessun arrotondamento
   const totOre=parseFloat((totArr/60).toFixed(2));
   const logoB64=LOGO_PDF;
-  const rows=sessioni.map(s=>{
+  const rows=_giorni.map(g=>(g.sessioni||[]).map(s=>{
     const dur=s.durata||calcDurataMin(s.inizio,s.fine);
     return `<tr>
-      <td class="tdl">${dataTA}</td>
+      <td class="tdl">${g.data||dataTA||'—'}</td>
       <td>${s.inizio||'—'}</td>
       <td>${s.fine||'—'}</td>
       <td>${parseFloat((dur/60).toFixed(2))} h</td>
       <td class="tdl">${s.referente||'—'}</td>
     </tr>`;
-  }).join('');
+  }).join('')).join('');
   const cliObj=db.clienti.find(c=>c.nome===rt.cliente)||{};
   const rawAddr=cliObj.indirizzo||rt.clienteAddr||'';
   const addrLines=(rawAddr.split('\n').filter(Boolean).join('<br>')+(cliObj.piva?`<br>P.IVA ${cliObj.piva}`:'')).trim();
@@ -3239,7 +3283,7 @@ function modRT(){
   gio=cRT.giornate?cRT.giornate.map(g=>({...g})):[makeG()];
   // Ripristina chiamate telefonica
   telChiamate=(cRT.chiamate||[]).map(c=>({...c}));
-  taSessioni=(cRT.sessioni||[]).map(s=>({...s}));
+  taGiornate=taGiornateFromRT();
   fotos=[];fSt={tec:!!cRT.firmaTec,cli:!!cRT.firmaCli};
   lang=cRT.lang||'EN';isPr=cRT.isPrelim||false;
   selTec=cRT.tecnici?cRT.tecnici.split(', ').filter(Boolean):[];
@@ -3997,15 +4041,25 @@ function spItemToRT(item){
       chiamate=Array.isArray(raw)?raw:(raw.chiamate||[]);
     }
   }catch(e){}
-  let sessioni=[];
+  let sessioni=[],taGiornate=[];
   try{
     if(f.SessioniJSON){
       const raw=JSON.parse(f.SessioniJSON);
-      // Nuovo formato: {pacchetto, oreAddebitare, oreEffettive, sessioni:[]}
-      // Vecchio formato: array puro
-      sessioni=Array.isArray(raw)?raw:(raw.sessioni||[]);
+      // Nuovo: {pacchetto, oreAddebitare, oreEffettive, giornate:[{data,sessioni:[]}], sessioni:[]}
+      // Vecchio: array puro
+      if(Array.isArray(raw)){ sessioni=raw; }
+      else { sessioni=raw.sessioni||[]; taGiornate=raw.giornate||[]; }
     }
   }catch(e){}
+  // Giornate presenti ma mirror piatto assente → ricostruisci (con data)
+  if(taGiornate.length&&!sessioni.length){
+    taGiornate.forEach(g=>(g.sessioni||[]).forEach(s=>sessioni.push({...s,data:g.data||''})));
+  }
+  // Solo piatto (vecchi RT) → crea una giornata con la DataIntervento
+  if(!taGiornate.length&&sessioni.length){
+    const _d=(f.DataIntervento||'').split('T')[0]||'';
+    taGiornate=[{data:_d,sessioni:sessioni.map(s=>({...s}))}];
+  }
 
   const tipo=f.Tipo0||f.Tipo||'';
   const tipoServizio=f.TipoServizio||'Standard';
@@ -4063,6 +4117,7 @@ function spItemToRT(item){
     saldoDopo:    parseInt(f.SaldoDopo||0),
     chiamate,
     sessioni,
+    taGiornate,
     chiamate_data: f.DataIntervento?.split('T')[0]||'',
     ta_data:      f.DataIntervento?.split('T')[0]||f.DataIntervento||'',
     ta_minutiUsati:parseInt(f.MinutiUsati||0),
@@ -4125,6 +4180,7 @@ function rtToSPFields(rt){
       pacchetto:      rt.pacchetto||'Spot',
       oreAddebitare:  rt.ta_oreUsate||0,
       oreEffettive:   rt.oreEffettive||0,
+      giornate:       rt.taGiornate||[],
       sessioni:       rt.sessioni||[]
     }),
   };
