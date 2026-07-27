@@ -269,31 +269,6 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 /* Watermark */
 .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
 
-${fontImport}
-    @page{size:A4 portrait;margin:20px}
-    #pdfTemplate,#pdfTemplate *{font-family:${fontMain}!important}
-    .pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:10pt;color:#222;box-sizing:border-box}
-    .pdf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #8B1A1A;padding-bottom:8px;margin-bottom:10px}
-    .pdf-logo-img{max-width:220px;height:auto;flex-shrink:0}
-    .pdf-company{font-size:9pt;color:#444;line-height:1.5;text-align:right;white-space:nowrap;flex-shrink:0}
-    .pdf-company strong{font-size:10pt;color:#222;display:block}
-    .pdf-boxes{display:flex;gap:16px;margin-top:10px;margin-bottom:10px}
-    .pdf-box{flex:1;border:1px solid #ccc;padding:12px 14px;font-size:10pt;line-height:1.6;border-radius:8px}
-    .pdf-sec{font-weight:700;font-size:11pt;color:#8B1A1A;border-bottom:1px solid #8B1A1A;padding-bottom:4px;margin:14px 0 6px}
-    .pdf-tbl{width:100%;border-collapse:collapse;font-size:9pt;margin-top:6px;word-wrap:break-word}
-    .pdf-tbl th{background:#8B1A1A;color:white;padding:5px 4px;text-align:center;border:1px solid #a83226;font-size:8.5pt;font-weight:700}
-    .pdf-tbl th.thl{text-align:left}
-    .pdf-tbl td{padding:5px 4px;border:1px solid #999;text-align:center;vertical-align:middle;font-size:9.5pt}
-    .pdf-tbl td.tdl{text-align:left}
-    .pdf-tbl tfoot td{font-weight:bold;background:#f0f0f0;border-top:2px solid #8B1A1A}
-    .pdf-tvrow td{background:#fffbf5!important;font-size:8.5pt;color:#888;padding:3px 5px!important;border-color:#ddd!important}
-    .pdf-wp{border:1px solid #ccc;padding:12px 14px;font-size:10pt;white-space:pre-wrap;min-height:80px;line-height:1.5;border-radius:8px}
-    .pdf-sigs{display:flex;justify-content:space-between;margin-top:40px;page-break-inside:avoid}
-    .pdf-sig{width:40%;text-align:center}
-    .pdf-sig-line{border-top:1px solid #000;padding-top:4px;font-size:10pt;color:#333;margin-top:2px}
-    .pdf-sig img{max-width:180px;height:auto;display:block;margin:0 auto 4px}
-    .pdf-sig-empty{height:55px}
-    .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
 </style>
   
 </head>
@@ -1044,7 +1019,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v158';
+const APP_VERSION='v159';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2967,7 +2942,33 @@ function getPDFStyles(forExport=false){
   // forExport=false → usa Barlow già caricato nella PWA
   const fontImport=forExport?'':"@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@700&display=swap');";
   const fontMain=forExport?"'Calibri','Segoe UI',Arial,sans-serif":"'Barlow',Arial,Helvetica,sans-serif";
-  return ``;
+  return `<style>
+${fontImport}
+@page{size:A4 portrait;margin:20px}
+#pdfTemplate,#pdfTemplate *{font-family:${fontMain}!important}
+.pdf-page{width:750px;padding:20px;background:white;position:relative;font-size:9pt;color:#222;line-height:1.4;box-sizing:border-box}
+.pdf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #8B1A1A;padding-bottom:8px;margin-bottom:10px}
+.pdf-logo-img{max-width:220px;height:auto;flex-shrink:0}
+.pdf-company{font-size:8pt;color:#444;line-height:1.5;text-align:right;white-space:nowrap;flex-shrink:0}
+.pdf-company strong{font-size:9pt;color:#222;display:block}
+.pdf-boxes{display:flex;gap:16px;margin-top:10px;margin-bottom:10px}
+.pdf-box{flex:1;border:1px solid #ccc;padding:12px 14px;font-size:9pt;line-height:1.6;border-radius:8px}
+.pdf-sec{font-weight:700;font-size:10pt;color:#8B1A1A;border-bottom:1px solid #8B1A1A;padding-bottom:4px;margin:14px 0 6px}
+.pdf-tbl{width:100%;border-collapse:collapse;font-size:8pt;margin-top:6px;word-wrap:break-word}
+.pdf-tbl th{background:#8B1A1A;color:white;padding:5px 4px;text-align:center;border:1px solid #a83226;font-size:7.5pt;font-weight:700}
+.pdf-tbl th.thl{text-align:left}
+.pdf-tbl td{padding:5px 4px;border:1px solid #999;text-align:center;vertical-align:middle;font-size:8.5pt}
+.pdf-tbl td.tdl{text-align:left}
+.pdf-tbl tfoot td{font-weight:bold;background:#f0f0f0;border-top:2px solid #8B1A1A}
+.pdf-tvrow td{background:#fffbf5!important;font-size:7.5pt;color:#888;padding:3px 5px!important;border-color:#ddd!important}
+.pdf-wp{border:1px solid #ccc;padding:12px 14px;font-size:9pt;white-space:pre-wrap;min-height:80px;line-height:1.5;border-radius:8px}
+.pdf-sigs{display:flex;justify-content:space-between;margin-top:40px;page-break-inside:avoid}
+.pdf-sig{width:40%;text-align:center}
+.pdf-sig-line{border-top:1px solid #000;padding-top:4px;font-size:9pt;color:#333;margin-top:2px}
+.pdf-sig img{max-width:180px;height:auto;display:block;margin:0 auto 4px}
+.pdf-sig-empty{height:55px}
+.pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
+</style>`;
 }
 
 // ══════════════════════════════════════
