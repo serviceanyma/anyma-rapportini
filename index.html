@@ -1019,7 +1019,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v159';
+const APP_VERSION='v160';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1913,6 +1913,30 @@ function switchGioMode(){
   if(!isTel&&!isTA) initStd();
 }
 
+function nTecRT(r){ return (r.tecnici||'').split(',').filter(t=>t.trim()).length||1; }
+function consumoOnSite(r,da,a){
+  return (r.giornate||[])
+    .filter(g=>(!da||g.data>=da)&&(!a||g.data<=a))
+    .reduce((s,g)=>s+parseFloat(g.oreScalate||0),0)*nTecRT(r);
+}
+function oreResidueOnSite(cliente,escludiId){
+  const c=getContratto(cliente,'Manutenzione');
+  if(!c||c.pacchetto==='Spot'||c.pacchetto==='Premium') return null;
+  const da=(c.dataInizio||'').split('T')[0], a=(c.dataFine||'').split('T')[0];
+  const usate=db.rapportini.filter(r=>r.cliente===cliente&&r.id!==escludiId)
+    .reduce((s,r)=>s+consumoOnSite(r,da,a),0);
+  return (c.saldoOre||0)-usate;
+}
+function aggiornaSaldoStd(){
+  const el=document.getElementById('stdSaldo'); if(!el||!cRT) return;
+  const res=oreResidueOnSite(cRT.cliente,cRT.id);
+  if(res===null){ el.textContent='N/A'; return; }
+  const qui=gio.reduce((s,g)=>s+parseFloat(g.oreScalate||0),0)*nTecRT(cRT);
+  cRT.saldoDopo=parseFloat((res-qui).toFixed(2));
+  el.textContent=cRT.saldoDopo.toFixed(2)+' h';
+  el.style.color=cRT.saldoDopo<0?'var(--cr2)':'#2ecc71';
+}
+
 function initStd(){
   if(!cRT.cliente) return;
   // Determina tipo contratto in base al tipo intervento
@@ -1925,11 +1949,10 @@ function initStd(){
   if(!card) return;
   card.style.display='block';
   if(elPac) elPac.textContent=contr.pacchetto||'Spot';
-  const isSpot=!contr||contr.pacchetto==='Spot'||contr.pacchetto==='Premium';
-  const saldo=isSpot?'N/A':(contr.saldoOre!=null?contr.saldoOre.toFixed(2)+' h':'—');
-  if(elSaldo) elSaldo.textContent=saldo;
   cRT.pacchetto=contr.pacchetto||'Spot';
-  cRT.saldoPrima=contr.saldoOre||0;
+  const _res=oreResidueOnSite(cRT.cliente,cRT.id);
+  cRT.saldoPrima=_res??0;
+  aggiornaSaldoStd();
   // Propaga pacchetto su tutte le giornate esistenti
   gio.forEach(g=>{ if(!g.pacchetto) g.pacchetto=cRT.pacchetto; });
 }
@@ -1945,6 +1968,7 @@ function onTipoChange(val){
 }
 
 function renderGio(){
+  const _packOn=!!cRT&&oreResidueOnSite(cRT.cliente,cRT.id)!==null;
   document.getElementById('gioList').innerHTML=gio.map((g,i)=>{
     const ol=g.oreLav||0;
     const ov=g.oreViag||0;
@@ -2046,6 +2070,9 @@ function renderGio(){
           </div>
         </div>
 
+        ${_packOn?`<div class="slbl">📦 Ore da scalare (per tecnico)</div>
+        <div class="fg"><input type="number" class="fc" min="0" step="0.5" value="${g.oreScalate||''}" placeholder="0"
+          oninput="updG(${i},'oreScalate',parseFloat(this.value)||0);aggiornaSaldoStd()"></div>`:''}
         <!-- Indennità -->
         <div class="slbl">🍽 Indennità</div>
         <div class="igrid">
@@ -3073,11 +3100,6 @@ async function salva(invia){
   // Teleassistenza: scala ore da contratto
   if(cRT.tipo==='Teleassistenza'&&cRT.ta_oreUsate>0){
     spAggiornaSaldo(cRT.cliente,'Teleassistenza',cRT.ta_oreUsate).catch(()=>{});
-  }
-  // Manutenzione: scala ore da contratto
-  if(cRT.tipo==='Manutenzione Ordinaria'||cRT.tipo==='Manutenzione Straordinaria'){
-    const totOreMan=(cRT.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0);
-    if(totOreMan>0) spAggiornaSaldo(cRT.cliente,'Manutenzione',totOreMan).catch(()=>{});
   }
 
   if(invia){
