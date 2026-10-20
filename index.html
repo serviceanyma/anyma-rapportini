@@ -1019,7 +1019,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v161';
+const APP_VERSION='v163';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -1914,10 +1914,27 @@ function switchGioMode(){
 }
 
 function nTecRT(r){ return (r.tecnici||'').split(',').filter(t=>t.trim()).length||1; }
+function oreScalateG(g){ return parseFloat(g.oreLav||0)+parseFloat(g.oreViag||0); }
+const MIN_TRASFERTA_H=4;
+// Raggruppa le giornate in trasferte: una trasferta parte con l'andata e chiude con il ritorno
+function trasferteRT(giornate){
+  const gr=[]; let cur=null;
+  (giornate||[]).forEach((g,i)=>{
+    const andata=!!(g.vAnDa||g.vAnA), ritorno=!!(g.vRetDa||g.vRetA);
+    if(!cur||andata){ cur={idx:[],tot:0}; gr.push(cur); }
+    cur.idx.push(i); cur.tot+=oreScalateG(g);
+    if(ritorno) cur=null;
+  });
+  gr.forEach(t=>{ t.scal=t.tot>0?Math.max(t.tot,MIN_TRASFERTA_H):0; t.min=t.tot>0&&t.tot<MIN_TRASFERTA_H; });
+  return gr;
+}
+function orePerTecnicoRT(giornate){ return trasferteRT(giornate).reduce((s,t)=>s+t.scal,0); }
+function isRTOnSite(r){ return r.tipo!=='Assistenza Telefonica'&&r.tipo!=='Teleassistenza'&&r.tipoServizio!=='Telefonica'; }
+function fmtH(v,l){ const s=(v||0).toFixed(2); return (l==='EN'?s:s.replace('.',','))+' h'; }
 function consumoOnSite(r,da,a){
-  return (r.giornate||[])
-    .filter(g=>(!da||g.data>=da)&&(!a||g.data<=a))
-    .reduce((s,g)=>s+parseFloat(g.oreScalate||0),0)*nTecRT(r);
+  if(!isRTOnSite(r)) return 0;
+  const gg=(r.giornate||[]).filter(g=>(!da||g.data>=da)&&(!a||g.data<=a));
+  return orePerTecnicoRT(gg)*nTecRT(r);
 }
 function oreResidueOnSite(cliente,escludiId){
   const c=getContratto(cliente,'Manutenzione');
@@ -1928,12 +1945,23 @@ function oreResidueOnSite(cliente,escludiId){
   return (c.saldoOre||0)-usate;
 }
 function aggiornaSaldoStd(){
-  const el=document.getElementById('stdSaldo'); if(!el||!cRT) return;
+  const el=document.getElementById('stdSaldo'); if(!el||!cRT||!isRTOnSite(cRT)) return;
   const res=oreResidueOnSite(cRT.cliente,cRT.id);
   if(res===null){ el.textContent='N/A'; return; }
-  const qui=gio.reduce((s,g)=>s+parseFloat(g.oreScalate||0),0)*nTecRT(cRT);
+  const nT=nTecRT(cRT);
+  const tr=trasferteRT(gio);
+  const qui=tr.reduce((s,t)=>s+t.scal,0)*nT;
   cRT.saldoDopo=parseFloat((res-qui).toFixed(2));
-  el.textContent=cRT.saldoDopo.toFixed(2)+' h';
+  el.textContent=fmtH(cRT.saldoDopo,'IT');
+  tr.forEach(t=>t.idx.forEach((i,k)=>{
+    const o=document.getElementById('cd_os_'+i); if(!o) return;
+    let txt=fmtH(oreScalateG(gio[i]),'IT');
+    if(k===t.idx.length-1){ // ultima giornata della trasferta: mostra il totale scalato
+      if(t.min) txt+=' → min. '+fmtH(MIN_TRASFERTA_H,'IT');
+      if(nT>1) txt+=' × '+nT+' = '+fmtH(t.scal*nT,'IT');
+    }
+    o.textContent=txt;
+  }));
   el.style.color=cRT.saldoDopo<0?'var(--cr2)':'#2ecc71';
 }
 
@@ -2070,9 +2098,9 @@ function renderGio(){
           </div>
         </div>
 
-        ${_packOn?`<div class="slbl">📦 Ore da scalare (per tecnico)</div>
-        <div class="fg"><input type="number" class="fc" min="0" step="0.5" value="${g.oreScalate||''}" placeholder="0"
-          oninput="updG(${i},'oreScalate',parseFloat(this.value)||0);aggiornaSaldoStd()"></div>`:''}
+        ${_packOn?`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:10px;background:var(--s2);border:1px solid #2ecc71;border-radius:var(--rs)">
+          <span style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--tx3);text-transform:uppercase">📦 Ore scalate (lav. + viag.)</span>
+          <span id="cd_os_${i}" style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:#2ecc71">—</span></div>`:''}
         <!-- Indennità -->
         <div class="slbl">🍽 Indennità</div>
         <div class="igrid">
@@ -2199,6 +2227,7 @@ function recalc(i){
 }
 
 function updTot(){
+  aggiornaSaldoStd();
   const _dispOre=v=>Number.isInteger(v)?v+'.00':(v%0.25===0?v.toFixed(2):v.toFixed(2));
   document.getElementById('totO').textContent=_dispOre(gio.reduce((s,g)=>s+parseFloat(g.oreLav||0),0));
   document.getElementById('totV').textContent=_dispOre(gio.reduce((s,g)=>s+parseFloat(g.oreViag||0),0));
@@ -2660,15 +2689,18 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   const _pac=rt.pacchetto||'Spot';
   const _saldoP=parseFloat(rt.saldoPrima||0);
   const _nTec=nTecRT(rt);
-  const _orePT=gd.reduce((s,g)=>s+parseFloat(g.oreScalate||0),0);
+  const _trPDF=trasferteRT(gd);
+  const _orePT=_trPDF.reduce((s,t)=>s+t.scal,0);
+  const _minPDF=_trPDF.some(t=>t.min);
   const _scal=_orePT*_nTec;
   const _resid=_saldoP-_scal;
-  const _fh=v=>v.toFixed(2)+' h';
-  const pacHtml=(!_pac||_pac==='Spot'||_pac==='Premium')?'':('<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;padding:9px 14px">'+
+  const _fh=v=>fmtH(v,l);
+  const pacHtml=(!_pac||_pac==='Spot'||_pac==='Premium')?'':('<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;padding:9px 14px">'+
     '<span><b>'+(l==='IT'?'Pacchetto':'Package')+':</b> '+_pac+'</span>'+
     '<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_fh(_saldoP)+'</span>'+
     '<span><b>'+(l==='IT'?'Ore scalate':'Hours deducted')+':</b> '+_fh(_scal)+
-      (_nTec>1?' ('+_orePT.toFixed(2)+' h × '+_nTec+')':'')+'</span>'+
+      (_nTec>1?' ('+_fh(_orePT)+' × '+_nTec+')':'')+
+      (_minPDF?' <span style="color:#888">— '+(l==='IT'?'min. '+_fh(MIN_TRASFERTA_H)+'/trasferta':'min. '+_fh(MIN_TRASFERTA_H)+'/trip')+'</span>':'')+'</span>'+
     '<span><b>'+(l==='IT'?'Saldo residuo':'Remaining balance')+':</b> '+_fh(_resid)+'</span>'+
     '</div>');
   return `
