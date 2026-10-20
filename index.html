@@ -1019,7 +1019,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v160';
+const APP_VERSION='v161';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -2658,10 +2658,18 @@ function buildPDFHTML(rt,gd,fT,fC,prelim,l){
   `}).join('');
 
   const _pac=rt.pacchetto||'Spot';
-  const _saldoP=rt.saldoPrima||0;
-  const pacHtml=(!_pac||_pac==='Spot')?'':('<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:9px 14px">'+
+  const _saldoP=parseFloat(rt.saldoPrima||0);
+  const _nTec=nTecRT(rt);
+  const _orePT=gd.reduce((s,g)=>s+parseFloat(g.oreScalate||0),0);
+  const _scal=_orePT*_nTec;
+  const _resid=_saldoP-_scal;
+  const _fh=v=>v.toFixed(2)+' h';
+  const pacHtml=(!_pac||_pac==='Spot'||_pac==='Premium')?'':('<div class="pdf-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;padding:9px 14px">'+
     '<span><b>'+(l==='IT'?'Pacchetto':'Package')+':</b> '+_pac+'</span>'+
-    '<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_saldoP+' h</span>'+
+    '<span><b>'+(l==='IT'?'Saldo iniziale':'Opening balance')+':</b> '+_fh(_saldoP)+'</span>'+
+    '<span><b>'+(l==='IT'?'Ore scalate':'Hours deducted')+':</b> '+_fh(_scal)+
+      (_nTec>1?' ('+_orePT.toFixed(2)+' h × '+_nTec+')':'')+'</span>'+
+    '<span><b>'+(l==='IT'?'Saldo residuo':'Remaining balance')+':</b> '+_fh(_resid)+'</span>'+
     '</div>');
   return `
   <div class="pdf-page">
@@ -4136,8 +4144,8 @@ function spItemToRT(item){
     minutiUsati:     minTel,
     minutiEffettivi: parseInt(f.MinutiEffettivi||0),
     oreEffettive:    parseFloat(f.OreEffettive||0),
-    saldoPrima:   parseInt(f.SaldoPrima||0),
-    saldoDopo:    parseInt(f.SaldoDopo||0),
+    saldoPrima:   parseFloat(f.SaldoPrima||0),
+    saldoDopo:    parseFloat(f.SaldoDopo||0),
     chiamate,
     sessioni,
     taGiornate,
@@ -4428,8 +4436,8 @@ async function spLoadContratti(){
         pacchetto:  f.Pacchetto||'Spot',
         saldoMinuti:parseInt(f.SaldoMinuti||0),
         saldoOre:   parseFloat(f.SaldoOre||0),
-        dataInizio: f.DataInizio||'',
-        dataFine:   f.DataFine||'',
+        dataInizio: f.DataInizio?new Date(f.DataInizio).toLocaleDateString('sv-SE'):'',
+        dataFine:   f.DataFine?new Date(f.DataFine).toLocaleDateString('sv-SE'):'',
         numContratto:f.NumContratto||'',
         attivo:     f.Attivo!==false&&f.Attivo!=='false',
         note:       f.Note||'',
