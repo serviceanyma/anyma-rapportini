@@ -12,6 +12,8 @@
 <!-- jsPDF + html2canvas for real A4 PDF generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Chart.js per i grafici della dashboard -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <!-- MSAL.js for Microsoft 365 authentication -->
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <style>
@@ -878,12 +880,9 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
-    <div class="stl" style="margin-bottom:10px">Ore per cliente</div>
-    <canvas id="chartCliOre" height="80"></canvas>
-  </div>
-  <div class="card" style="margin-bottom:10px">
-    <div class="stl" style="margin-bottom:10px">Andamento mensile RT</div>
-    <canvas id="chartMensile" height="100"></canvas>
+    <div class="stl" style="margin-bottom:10px">Andamento mensile</div>
+    <div style="position:relative;height:240px"><canvas id="chartMensile"></canvas></div>
+    <div id="chartMensileVuoto" style="display:none;color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun rapportino nel periodo</div>
   </div>
   <div style="height:75px"></div>
 </div>
@@ -1022,7 +1021,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v164';
+const APP_VERSION='v166';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -5126,7 +5125,7 @@ function renderDash(){
     }
     if(r.stato==='Inviato'||r.stato==='Firmato') byClient[r.cliente].inviati++;
   });
-  const rows=Object.values(byClient).sort((a,b)=>b.ore-a.ore);
+  const rows=Object.values(byClient).sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','it',{sensitivity:'base'}));
   if(rows.length){
     document.getElementById('dashTabCli').innerHTML=`
       <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:340px">
@@ -5367,27 +5366,43 @@ function renderDashCharts(list){
     });
   }else if(ctxC){ctxC.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
 
-  // ── 3. Andamento mensile RT (line) ──
+  // ── Andamento mensile: RT (barre) e ore intervento (linea) per i 12 mesi dell'anno selezionato ──
   destroyChart('mensile');
-  const byMese={};
+  if(typeof Chart==='undefined') return;
+  const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  const annoSel=parseInt(document.getElementById('dashAnno')?.value)||new Date().getFullYear();
+  const rtMese=new Array(12).fill(0), oreMese=new Array(12).fill(0);
   list.forEach(r=>{
-    const d=r.dataCreazione?r.dataCreazione.substring(0,7):'';
-    if(d) byMese[d]=(byMese[d]||0)+1;
+    const d=r.dataIntervento||r.giornate?.[0]?.data||r.ta_data||r.chiamate_data||(r.dataCreazione||'').substring(0,10);
+    if(!d||parseInt(d.substring(0,4))!==annoSel) return;
+    const m=parseInt(d.substring(5,7))-1; if(m<0||m>11) return;
+    rtMese[m]++;
+    const isTF=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+    oreMese[m]+= isTF ? (r._minTel??r.minutiUsati??0)/60
+      : (r.tipo==='Teleassistenza' ? (r._oreTA??r.ta_oreUsate??0)
+      : (r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0));
   });
-  const meseKeys=Object.keys(byMese).sort().slice(-12);
-  const meseLabels=meseKeys.map(k=>{const [y,m]=k.split('-');return ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][parseInt(m)-1];});
-  const meseData=meseKeys.map(k=>byMese[k]);
   const ctxM=document.getElementById('chartMensile');
-  if(ctxM&&meseKeys.length){
-    _charts['mensile']=new Chart(ctxM,{
-      type:'line',
-      data:{labels:meseLabels,datasets:[{label:'RT',data:meseData,borderColor:'#8B1A1A',backgroundColor:'rgba(139,26,26,.15)',tension:.3,fill:true,pointBackgroundColor:'#8B1A1A',pointRadius:4}]},
-      options:{responsive:true,plugins:{legend:{display:false}},scales:{
-        x:{ticks:{color:'#aaa',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},
-        y:{ticks:{color:'#aaa',font:{size:10},stepSize:1},grid:{color:'rgba(255,255,255,.05)'}}
+  const vuoto=document.getElementById('chartMensileVuoto');
+  const nessuno=rtMese.every(v=>v===0);
+  if(vuoto) vuoto.style.display=nessuno?'block':'none';
+  if(!ctxM||nessuno) return;
+  const cs=getComputedStyle(document.documentElement);
+  const cv=(n,f)=>(cs.getPropertyValue(n)||'').trim()||f;
+  const cBrand=cv('--brand','#c0392b'), cOre=cv('--success','#3ecf8e'), cTx=cv('--ink-3','#9a8878'), cGrid='rgba(255,255,255,.06)';
+  _charts['mensile']=new Chart(ctxM,{
+    data:{labels:MESI,datasets:[
+      {type:'bar',label:'Rapportini',data:rtMese,backgroundColor:cBrand,borderRadius:4,yAxisID:'y',order:2},
+      {type:'line',label:'Ore intervento',data:oreMese.map(v=>+v.toFixed(1)),borderColor:cOre,backgroundColor:cOre,cubicInterpolationMode:'monotone',pointRadius:3,yAxisID:'y1',order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,position:'top',labels:{color:cTx,font:{size:11},boxWidth:10}}},
+      scales:{
+        x:{ticks:{color:cTx,font:{size:10}},grid:{display:false}},
+        y:{position:'left',beginAtZero:true,ticks:{color:cTx,font:{size:10},precision:0},grid:{color:cGrid},title:{display:true,text:'RT',color:cTx,font:{size:10}}},
+        y1:{position:'right',beginAtZero:true,ticks:{color:cTx,font:{size:10}},grid:{display:false},title:{display:true,text:'Ore',color:cTx,font:{size:10}}}
       }}
-    });
-  }else if(ctxM){ctxM.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
+  });
 }
 
 // ══════════════════════════════════════
