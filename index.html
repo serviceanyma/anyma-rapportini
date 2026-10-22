@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Rapportini">
 <meta name="theme-color" content="#0d0d0d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <title>ANYMA — Rapportini</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono&display=swap" rel="stylesheet">
 <!-- ANYMA Design System: colori, misure e componenti condivisi con ANYMA-NET -->
@@ -1021,7 +1027,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v167';
+const APP_VERSION='v168';
 
 // ══════════════════════════════════════
 // APERTURA DA TICKET (ANYMA-NET → "Crea rapportino")
@@ -3851,14 +3857,33 @@ async function m365Login(){
   const app=getMSAL();
   if(!app){toast('Errore inizializzazione MSAL','err');return;}
   try{
+    if(isStandaloneApp()){
+      // App installata (iPhone/Android): i popup non tornano all'app → login con reindirizzamento
+      await app.loginRedirect({scopes:GRAPH_SCOPES,prompt:'select_account'});
+      return;
+    }
     const res=await app.loginPopup({scopes:GRAPH_SCOPES,prompt:'select_account'});
-    m365Token=res.accessToken;
-    m365User={
-      displayName:res.account.name,
-      mail:res.account.username,
-      userPrincipalName:res.account.username,
-      _account:res.account
-    };
+    m365OnLogin(res.account,res.accessToken);
+  }catch(e){
+    if(e.errorCode!=='user_cancelled') toast('Errore login: '+e.message,'err');
+  }
+}
+
+// true quando Rapportini è aperto come app installata sulla schermata Home
+function isStandaloneApp(){
+  return window.navigator.standalone===true || (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
+}
+
+// Imposta l'utente dopo un login (popup, reindirizzamento o sessione già salvata)
+function m365OnLogin(account,token){
+  m365Token=token||null;
+  m365User={
+    displayName:account.name,
+    mail:account.username,
+    userPrincipalName:account.username,
+    _account:account
+  };
+  try{
     updateM365Status();
     updatePAStatus();  // aggiorna stato invio PA
     toast(`✓ Connesso come ${m365User.displayName}`,'suc');
@@ -3874,9 +3899,7 @@ async function m365Login(){
     // Aggiorna impostazioni se aperte
     const cfgScr=document.getElementById('scrCfg');
     if(cfgScr?.classList.contains('on')) updateM365Status();
-  }catch(e){
-    if(e.errorCode!=='user_cancelled') toast('Errore login: '+e.message,'err');
-  }
+  }catch(e){ console.warn('m365OnLogin',e); }
 }
 
 async function m365GetToken(){
@@ -3890,6 +3913,7 @@ async function m365GetToken(){
   }catch(e){
     // Token scaduto — chiede re-login interattivo
     try{
+      if(isStandaloneApp()){ await app.acquireTokenRedirect({scopes:GRAPH_SCOPES,account:m365User._account}); return m365Token; }
       const res=await app.acquireTokenPopup({scopes:GRAPH_SCOPES,account:m365User._account});
       m365Token=res.accessToken;
       return m365Token;
@@ -3898,6 +3922,8 @@ async function m365GetToken(){
 }
 
 function m365Logout(){
+  // Svuota la sessione salvata senza lasciare l'app (altrimenti al riavvio rientrerebbe da sola)
+  try{ const app=getMSAL(); if(app) app.logoutRedirect({account:m365User?._account,onRedirectNavigate:()=>false}); }catch(e){}
   m365Token=null;m365User=null;msalInstance=null;
   updateM365Status();
   updatePAStatus();
@@ -5643,13 +5669,43 @@ initLogo();
 // Ripristina IDs SP dalla sessione precedente (evita discover lento)
 spRestoreCache();
 
-// Avvio: mostra login se non autenticato
-if(m365User){
-  renderHome();
-} else {
+// Avvio: completa un eventuale login con reindirizzamento, poi rientra con la sessione salvata
+(async function bootAuth(){
+  const app=getMSAL();
+  if(app){
+    let acc=null, tok=null;
+    try{
+      const res=await app.handleRedirectPromise();
+      if(res){ acc=res.account; tok=res.accessToken; }
+      if(!acc) acc=app.getAllAccounts()[0]||null;
+      if(acc && !tok){
+        try{ tok=(await app.acquireTokenSilent({scopes:GRAPH_SCOPES,account:acc})).accessToken; }
+        catch(e){ console.warn('Token non rinnovato (offline?)',e); }
+      }
+    }catch(e){ console.warn('Ripristino sessione non riuscito',e); }
+    if(acc){
+      m365OnLogin(acc,tok);
+      if(!tok) toast('Modalità offline: i rapportini verranno sincronizzati al ritorno della rete','wrn',5000);
+      goHome(); renderHome(); setTimeout(apriDaTicket,300);
+      return;
+    }
+  }
   showScr('scrLogin');
   initLoginScreen();
+})();
+
+// Service worker: avvio offline e aggiornamenti
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW',e)); });
 }
+// Ritorno della rete: rinnova il token e sincronizza i rapportini salvati offline
+window.addEventListener('online',async()=>{
+  if(!m365User) return;
+  try{
+    const t=await m365GetToken();
+    if(t){ m365Token=t; toast('Rete disponibile: sincronizzazione in corso…','suc'); autoSyncOnLogin(); }
+  }catch(e){}
+});
 
 // Auto-sync SharePoint all'avvio (dopo login)
 async function autoSyncOnLogin(){
