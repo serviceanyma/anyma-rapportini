@@ -1021,7 +1021,48 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v166';
+const APP_VERSION='v167';
+
+// ══════════════════════════════════════
+// APERTURA DA TICKET (ANYMA-NET → "Crea rapportino")
+// ══════════════════════════════════════
+const TICKET_LIST_ID='b8fab561-8b6d-452a-aa68-ccc89a98c370'; // AnymaTicket su /sites/SERVICE
+(function(){
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.get('tkt')){
+      sessionStorage.setItem('anyma_da_ticket',JSON.stringify({
+        tkt:q.get('tkt')||'', tktId:q.get('tktId')||'', cliente:q.get('cliente')||'',
+        ogg:q.get('ogg')||'', desc:q.get('desc')||'', tipo:q.get('tipo')||''}));
+      history.replaceState(null,'',location.pathname);
+    }
+  }catch(e){}
+})();
+function apriDaTicket(){
+  let p=null; try{p=JSON.parse(sessionStorage.getItem('anyma_da_ticket')||'null');}catch(e){}
+  if(!p||!p.tkt) return;
+  sessionStorage.removeItem('anyma_da_ticket');
+  nuovoRT();
+  const nome=(p.cliente||'').trim().toLowerCase();
+  const c=db.clienti.find(x=>(x.nome||'').trim().toLowerCase()===nome);
+  if(c){ document.getElementById('inCli').value=c.id; onCliChange(); }
+  else if(p.cliente) toast('Cliente "'+p.cliente+'" non trovato: selezionalo','wrn',5000);
+  if(p.tipo && db.tipi.includes(p.tipo)){ document.getElementById('inTipo').value=p.tipo; onTipoChange(p.tipo); }
+  cRT.attivita='Rif. ticket '+p.tkt+(p.ogg?' — '+p.ogg:'')+(p.desc?'\n\n'+p.desc:'');
+  cRT.ticketId=p.tkt; cRT.ticketSpId=p.tktId;
+  toast('📋 Rapportino dal ticket '+p.tkt,'suc',4000);
+}
+// Dopo il primo salvataggio su SharePoint scrive il numero RT nel ticket di origine
+async function tktCollegaRT(rt){
+  if(!rt.ticketSpId||rt._tktLinked||!m365Token) return;
+  const sid=await spGetSiteId(); const tok=await m365GetToken(); if(!tok) return;
+  const r=await fetch(`${GRAPH}/sites/${sid}/lists/${TICKET_LIST_ID}/items/${rt.ticketSpId}/fields`,{
+    method:'PATCH',headers:{Authorization:`Bearer ${tok}`,'Content-Type':'application/json'},
+    body:JSON.stringify({RTCollegato:rt.numRT})});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  rt._tktLinked=true;
+  toast('🔗 '+rt.numRT+' collegato al ticket '+rt.ticketId,'suc');
+}
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('appVersion');if(el)el.textContent=APP_VERSION;const lv=document.getElementById('loginVersion');if(lv)lv.textContent=APP_VERSION;});
 
 
@@ -3096,6 +3137,7 @@ async function salva(invia){
         if(idx>=0) db.rapportini[idx]=cRT;
         saveDB();
         toast('✓ '+cRT.numRT+' salvato su SharePoint','suc');
+        if(cRT.ticketSpId) tktCollegaRT(cRT).catch(e=>toast('⚠️ Collegamento al ticket non riuscito: '+e.message,'wrn',6000));
       }
     }catch(e){
       // Fallback offline: segna come pending sync
@@ -5567,7 +5609,7 @@ async function doLogin(){
     if(m365User){
       // Login OK → entra nella PWA
       setLoginMsg('✓ Accesso effettuato','var(--ok)');
-      setTimeout(()=>{ goHome(); renderHome(); },400);
+      setTimeout(()=>{ goHome(); renderHome(); setTimeout(apriDaTicket,300); },400);
     } else {
       setLoginMsg('Login annullato o fallito','var(--cr)');
     }
