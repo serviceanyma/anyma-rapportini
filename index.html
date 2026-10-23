@@ -881,6 +881,14 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   <!-- KPI cards -->
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px" id="dashKPI"></div>
 
+  <!-- Grafici -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="stl" id="chartMensileTitolo" style="margin-bottom:10px">Andamento mensile</div>
+    <div id="chartMensileChips" class="dchips"></div>
+    <div style="position:relative;height:260px"><canvas id="chartMensile"></canvas></div>
+    <div id="chartMensileVuoto" style="display:none;color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun rapportino nel periodo</div>
+  </div>
+
   <!-- Tabella per cliente -->
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Riepilogo per cliente</div>
@@ -896,13 +904,6 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
     <div id="cliDetailTable" style="overflow-x:auto"></div>
   </div>
 
-  <!-- Grafici -->
-  <div class="card" style="margin-bottom:10px">
-    <div class="stl" id="chartMensileTitolo" style="margin-bottom:10px">Andamento mensile</div>
-    <div id="chartMensileChips" class="dchips"></div>
-    <div style="position:relative;height:260px"><canvas id="chartMensile"></canvas></div>
-    <div id="chartMensileVuoto" style="display:none;color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun rapportino nel periodo</div>
-  </div>
   <div style="height:75px"></div>
 </div>
 
@@ -1040,7 +1041,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v172';
+const APP_VERSION='v174';
 
 /* ══ CONSUMI PACCHETTI (codice identico in Rapportini e ANYMA-NET) ══
    Saldo = quantità acquistata nel contratto (SaldoOre / SaldoMinuti) − consumi dei RT nella validità.
@@ -5158,7 +5159,9 @@ async function dashSyncSP(){
     if(selA){
       const anni=[...new Set(db.rapportini.map(r=>r.dataCreazione?new Date(r.dataCreazione).getFullYear():annoCorrente))].sort((a,b)=>b-a);
       if(!anni.includes(annoCorrente)) anni.unshift(annoCorrente);
-      selA.innerHTML=anni.map(a=>`<option value="${a}"${a===annoCorrente?'selected':''}>${a}</option>`).join('');
+      const _prevA=selA.value;
+      selA.innerHTML=anni.map(a=>`<option value="${a}"${a===annoCorrente?'selected':''}>${a}</option>`).join('')+'<option value="all">Tutti gli anni</option>';
+      if(_prevA==='all') selA.value='all';
     }
     if(selC){
       const cl=[...new Set(db.rapportini.map(r=>r.cliente).filter(Boolean))].sort();
@@ -5189,7 +5192,9 @@ function initDash(){
   if(!anni.includes(annoCorrente)) anni.unshift(annoCorrente);
 
   const selA=document.getElementById('dashAnno');
-  selA.innerHTML=anni.map(a=>`<option value="${a}"${a===annoCorrente?'selected':''}>${a}</option>`).join('');
+  const _prevA=selA.value;
+  selA.innerHTML=anni.map(a=>`<option value="${a}"${a===annoCorrente?'selected':''}>${a}</option>`).join('')+'<option value="all">Tutti gli anni</option>';
+  if(_prevA==='all') selA.value='all';
 
   // Populate cliente filter
   const selC=document.getElementById('dashCli');
@@ -5201,7 +5206,7 @@ function initDash(){
 
 function getDashFiltered(){
   const annoVal=document.getElementById('dashAnno')?.value;
-  const anno=annoVal?parseInt(annoVal):new Date().getFullYear();
+  const anno=annoVal==='all'?null:(annoVal?parseInt(annoVal):new Date().getFullYear());
   const cli=document.getElementById('dashCli')?.value||'';
   return db.rapportini.filter(r=>{
     const _dInt=r.dataIntervento||r.ta_data||r.chiamate_data||(r.giornate?.[0]?.data)||'';
@@ -5214,6 +5219,8 @@ function getDashFiltered(){
 
 function renderDash(){
   const list=getDashFiltered();
+  { const _cd=document.getElementById('cardCliDetail');
+    if(_cd && _cd.style.display!=='none' && _dashCliSel && !list.some(r=>r.cliente===_dashCliSel)){ _cd.style.display='none'; _dashCliSel=null; } }
   const anno=document.getElementById('dashAnno')?.value||new Date().getFullYear();
 
   // ── KPI ──
@@ -5481,9 +5488,10 @@ function renderDashCharts(list){
   if(_dashCliSel && !list.some(r=>r.cliente===_dashCliSel)) _dashCliSel=null;
   if(_dashCliSel) list=list.filter(r=>r.cliente===_dashCliSel);
   const _tit=document.getElementById('chartMensileTitolo');
+  const _titBase=document.getElementById('dashAnno')?.value==='all'?'Andamento per anno':'Andamento mensile';
   if(_tit) _tit.innerHTML=_dashCliSel
-    ? 'Andamento mensile — <span style="color:var(--cr2)">'+_dashCliSel.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</span> <button class="btn bgh bsm" onclick="chiudiCliDetail()" style="margin-left:6px;padding:3px 9px;font-size:10px">✕ Tutti i clienti</button>'
-    : 'Andamento mensile';
+    ? _titBase+' — <span style="color:var(--cr2)">'+_dashCliSel.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</span> <button class="btn bgh bsm" onclick="chiudiCliDetail()" style="margin-left:6px;padding:3px 9px;font-size:10px">✕ Tutti i clienti</button>'
+    : _titBase;
   // Palette colori
   const PAL=['#8B1A1A','#2ecc71','#06b6d4','#a78bfa','#f59e0b','#ef4444','#3b82f6','#10b981'];
 
@@ -5546,13 +5554,20 @@ function renderDashCharts(list){
   destroyChart('mensile');
   if(typeof Chart==='undefined') return;
   const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-  const annoSel=parseInt(document.getElementById('dashAnno')?.value)||new Date().getFullYear();
-  const z=()=>new Array(12).fill(0);
+  const _annoVal=document.getElementById('dashAnno')?.value;
+  const tuttiAnni=_annoVal==='all';
+  const annoSel=parseInt(_annoVal)||new Date().getFullYear();
+  const dataRT=r=>r.dataIntervento||r.giornate?.[0]?.data||r.ta_data||r.chiamate_data||(r.dataCreazione||'').substring(0,10);
+  const ANNI=tuttiAnni?[...new Set(list.map(dataRT).filter(Boolean).map(d=>d.substring(0,4)))].sort():[];
+  const LAB=tuttiAnni?ANNI:MESI;
+  const z=()=>new Array(LAB.length).fill(0);
   const M={rt:z(),loco:z(),viag:z(),ta:z(),tel:z()};
   list.forEach(r=>{
     const d=r.dataIntervento||r.giornate?.[0]?.data||r.ta_data||r.chiamate_data||(r.dataCreazione||'').substring(0,10);
-    if(!d||parseInt(d.substring(0,4))!==annoSel) return;
-    const m=parseInt(d.substring(5,7))-1; if(m<0||m>11) return;
+    if(!d) return;
+    let m;
+    if(tuttiAnni){ m=ANNI.indexOf(d.substring(0,4)); if(m<0) return; }
+    else { if(parseInt(d.substring(0,4))!==annoSel) return; m=parseInt(d.substring(5,7))-1; if(m<0||m>11) return; }
     M.rt[m]++;
     const isTF=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
     const isTA=r.tipo==='Teleassistenza';
@@ -5600,7 +5615,7 @@ function renderDashCharts(list){
   });
   const hasRT=sel.includes('rt'), hasOre=sel.some(k=>k!=='rt');
   _charts['mensile']=new Chart(ctxM,{
-    data:{labels:MESI,datasets:ds},
+    data:{labels:LAB,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+(c.dataset.yAxisID==='y1'?c.parsed.y:c.parsed.y.toFixed(1).replace('.',',')+' h'),
