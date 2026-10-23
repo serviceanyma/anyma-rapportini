@@ -1041,7 +1041,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v175';
+const APP_VERSION='v176';
 // Ore decimali → h:mm (7,75 → 7:45)
 function fmtHM(v){ v=Math.max(0,+v||0); let h=Math.floor(v), m=Math.round((v-h)*60); if(m===60){h++;m=0;} return h+':'+String(m).padStart(2,'0'); }
 
@@ -5253,7 +5253,7 @@ function renderDash(){
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Rapportini</div>
     </div>
     <div class="card" style="border-left:3px solid var(--ok);padding:12px">
-      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${totOreInLoco.toFixed(1)}</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#2ecc71">${fmtHM(totOreInLoco)}</div>
       <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore in loco</div>
     </div>
     <div class="card" style="border-left:3px solid var(--warn);padding:12px">
@@ -5261,7 +5261,7 @@ function renderDash(){
       <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">KM totali</div>
     </div>
     <div class="card" style="border-left:3px solid #8b5cf6;padding:12px">
-      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#a78bfa">${totViag.toFixed(1)}</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#a78bfa">${fmtHM(totViag)}</div>
       <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore viaggio</div>
     </div>
     <div class="card" style="border-left:3px solid var(--ok);padding:12px">
@@ -5269,7 +5269,7 @@ function renderDash(){
       <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Inviati</div>
     </div>
     <div class="card" style="border-left:3px solid #06b6d4;padding:12px">
-      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${totOreTeleass.toFixed(1)}</div>
+      <div style="font-size:25px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:#22d3ee">${fmtHM(totOreTeleass)}</div>
       <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">Ore teleass.</div>
     </div>
     <div class="card" style="border-left:3px solid var(--cr);padding:12px">
@@ -5320,9 +5320,9 @@ function renderDash(){
             <tr style="border-bottom:1px solid var(--b1);${i%2===0?'background:rgba(255,255,255,.02)':''};cursor:pointer" onclick="mostraCliDetail('${r.nome}')">
               <td style="padding:7px 4px;font-weight:600;color:var(--cr2);text-decoration:underline dotted">${r.nome}</td>
               <td style="text-align:center;padding:7px 4px;color:var(--cr2);font-weight:700">${r.rt}</td>
-              <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${r.oreLoco.toFixed(1)}</td>
-              <td style="text-align:center;padding:7px 4px;color:#a78bfa">${r.viag.toFixed(1)}</td>
-              <td style="text-align:center;padding:7px 4px;color:#06b6d4">${r.oreTeleass.toFixed(1)}</td>
+              <td style="text-align:center;padding:7px 4px;color:#2ecc71;font-weight:700">${fmtHM(r.oreLoco)}</td>
+              <td style="text-align:center;padding:7px 4px;color:#a78bfa">${fmtHM(r.viag)}</td>
+              <td style="text-align:center;padding:7px 4px;color:#06b6d4">${fmtHM(r.oreTeleass)}</td>
               <td style="text-align:center;padding:7px 4px;color:#f97316;font-weight:700">${r.minTel||0}'</td>
               <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${r.inviati}/${r.rt}</td>
             </tr>`).join('')}
@@ -5331,9 +5331,9 @@ function renderDash(){
           <tr style="border-top:2px solid var(--b2);font-weight:700">
             <td style="padding:7px 4px;color:var(--tx2)">TOTALE</td>
             <td style="text-align:center;padding:7px 4px;color:var(--cr2)">${rows.reduce((s,r)=>s+r.rt,0)}</td>
-            <td style="text-align:center;padding:7px 4px;color:#2ecc71">${rows.reduce((s,r)=>s+r.oreLoco,0).toFixed(1)}</td>
-            <td style="text-align:center;padding:7px 4px;color:#a78bfa">${rows.reduce((s,r)=>s+r.viag,0).toFixed(1)}</td>
-            <td style="text-align:center;padding:7px 4px;color:#06b6d4">${rows.reduce((s,r)=>s+r.oreTeleass,0).toFixed(1)}</td>
+            <td style="text-align:center;padding:7px 4px;color:#2ecc71">${fmtHM(rows.reduce((s,r)=>s+r.oreLoco,0))}</td>
+            <td style="text-align:center;padding:7px 4px;color:#a78bfa">${fmtHM(rows.reduce((s,r)=>s+r.viag,0))}</td>
+            <td style="text-align:center;padding:7px 4px;color:#06b6d4">${fmtHM(rows.reduce((s,r)=>s+r.oreTeleass,0))}</td>
             <td style="text-align:center;padding:7px 4px;color:#f97316">${rows.reduce((s,r)=>s+(r.minTel||0),0)}'</td>
             <td style="text-align:center;padding:7px 4px;color:var(--tx2)">${rows.reduce((s,r)=>s+r.inviati,0)}</td>
           </tr>
@@ -5398,11 +5398,11 @@ function mostraCliDetail(nomeCli){
       numRT:r.numRT||r.id||'—',
       data:r.dataIntervento||r.dataCreazione?.split('T')[0]||'—',
       tipo:r.tipo||'—',
-      oreLav:(isTel||isTelAs)?'—':oreLav.toFixed(1),
-      viag:isTel?'—':viag.toFixed(1),
+      oreLav:(isTel||isTelAs)?'—':oreLav,
+      viag:isTel?'—':viag,
       km:isTel?'—':km,
       pause:(isTel||isTelAs)?'—':pauseStr,
-      oreTa:isTelAs?oreTa.toFixed(1):'—',
+      oreTa:isTelAs?oreTa:'—',
       minTel:isTel?getMinTelR(r):null,
       stato:r.stato||'—'
     };
@@ -5447,11 +5447,11 @@ function mostraCliDetail(nomeCli){
             <td style="padding:6px 4px;color:var(--cr2);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.numRT}</td>
             <td style="padding:6px 4px;color:var(--tx);white-space:nowrap">${r.data}</td>
             <td style="padding:6px 4px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.tipo}</td>
-            <td style="text-align:center;padding:6px 4px;color:#2ecc71;font-weight:700">${r.oreLav}</td>
-            <td style="text-align:center;padding:6px 4px;color:#a78bfa">${r.viag}</td>
+            <td style="text-align:center;padding:6px 4px;color:#2ecc71;font-weight:700">${r.oreLav==='—'?'—':fmtHM(r.oreLav)}</td>
+            <td style="text-align:center;padding:6px 4px;color:#a78bfa">${r.viag==='—'?'—':fmtHM(r.viag)}</td>
             <td style="text-align:center;padding:6px 4px;color:var(--warn)">${r.km}</td>
             <td style="padding:6px 4px;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.pause}</td>
-            <td style="text-align:center;padding:6px 4px;color:#06b6d4">${r.oreTa}</td>
+            <td style="text-align:center;padding:6px 4px;color:#06b6d4">${r.oreTa==='—'?'—':fmtHM(r.oreTa)}</td>
             <td style="text-align:center;padding:6px 4px;color:#f97316">${r.minTel!=null?r.minTel+"'":'—'}</td>
             <td style="text-align:center;padding:6px 4px;color:var(--tx2)">${r.stato}</td>
           </tr>`).join('')}
@@ -5459,11 +5459,11 @@ function mostraCliDetail(nomeCli){
       <tfoot>
         <tr style="border-top:2px solid var(--b2);font-weight:700">
           <td colspan="3" style="padding:6px 4px;color:var(--tx2)">TOTALE</td>
-          <td style="text-align:center;padding:6px 4px;color:#2ecc71">${totOreLav.toFixed(1)}</td>
-          <td style="text-align:center;padding:6px 4px;color:#a78bfa">${totViag.toFixed(1)}</td>
+          <td style="text-align:center;padding:6px 4px;color:#2ecc71">${fmtHM(totOreLav)}</td>
+          <td style="text-align:center;padding:6px 4px;color:#a78bfa">${fmtHM(totViag)}</td>
           <td style="text-align:center;padding:6px 4px;color:var(--warn)">${totKm}</td>
           <td></td>
-          <td style="text-align:center;padding:6px 4px;color:#06b6d4">${totOreTa.toFixed(1)}</td>
+          <td style="text-align:center;padding:6px 4px;color:#06b6d4">${fmtHM(totOreTa)}</td>
           <td></td>
           <td></td>
         </tr>
