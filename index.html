@@ -1028,7 +1028,92 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v169';
+const APP_VERSION='v170';
+
+/* ══ CONSUMI PACCHETTI (codice identico in Rapportini e ANYMA-NET) ══
+   Saldo = quantità acquistata nel contratto (SaldoOre / SaldoMinuti) − consumi dei RT nella validità.
+   Teleassistenza: ore × coefficiente della fascia oraria (contratto D221).
+   Telefonica: minuti arrotondati per RT (Standard al minuto, Spot/Base ai 5 min). */
+function csTAFasce(inizio, fine, dataStr, pacchetto){
+  if(!inizio||!fine) return [];
+  var p=(pacchetto||'').toUpperCase();
+  if(p.indexOf('SPOT')>=0) return [];
+  var isPrem=p.indexOf('PREMIUM')>=0;
+  try{
+    var d=dataStr?new Date(dataStr):new Date(), dow=d.getDay(), fer=(dow>=1&&dow<=5);
+    var toMin=function(t){var pt=t.split(':');return parseInt(pt[0])*60+(parseInt(pt[1])||0);};
+    var mI=toMin(inizio), mF=toMin(fine); if(mF<=mI) mF+=1440;
+    var L=fer?[{label:'Notturna',coeff:1.75,da:0,a:360,pf:false},{label:'Straord.',coeff:1.5,da:360,a:480,pf:true},
+      {label:'Ordinaria',coeff:1,da:480,a:1020,pf:true},{label:'Straord.',coeff:1.5,da:1020,a:1320,pf:true},{label:'Notturna',coeff:1.75,da:1320,a:1800,pf:false}]
+      :[{label:'Nott.Str.',coeff:2,da:0,a:360,pf:false},{label:'Straord.',coeff:1.5,da:360,a:1320,pf:true},{label:'Nott.Str.',coeff:2,da:1320,a:1800,pf:false}];
+    var out=[];
+    L.forEach(function(fl){var si=Math.max(mI,fl.da), sf=Math.min(mF,fl.a);
+      if(sf>si) out.push({label:fl.label,coeff:fl.coeff,flat:isPrem&&fl.pf,minuti:sf-si});});
+    return out;
+  }catch(e){ return []; }
+}
+function csTAOre(fasce, durMin, coeff){
+  if(fasce&&fasce.length) return fasce.reduce(function(a,fc){return a+(fc.minuti/60)*fc.coeff;},0);
+  if(coeff!==undefined&&coeff!==null) return (parseFloat(durMin)||0)/60*parseFloat(coeff);
+  return (parseFloat(durMin)||0)/60;
+}
+function csDurMin(s){
+  var d=parseFloat(s.durata)||0;
+  if(!d&&s.inizio&&s.fine){ try{var a=s.inizio.split(':'),b=s.fine.split(':');var mi=+a[0]*60+(+a[1]||0),mf=+b[0]*60+(+b[1]||0);if(mf<mi)mf+=1440;d=mf-mi;}catch(e){} }
+  return d;
+}
+// Ore addebitate di un RT di Teleassistenza (campi come su SharePoint), solo sessioni con data in [da,a]
+function csConsumoTA(f, da, a){
+  var w={}; try{ w=JSON.parse(f.SessioniJSON||'{}'); }catch(e){}
+  var dataFb=(f.DataIntervento||'').split('T')[0];
+  var ss=[];
+  if(Array.isArray(w)) ss=w.map(function(s){return Object.assign({},s,{data:s.data||dataFb});});
+  else if(Array.isArray(w.giornate)&&w.giornate.length) w.giornate.forEach(function(g){(g.sessioni||[]).forEach(function(s){ss.push(Object.assign({},s,{data:g.data||dataFb}));});});
+  else ss=(w.sessioni||[]).map(function(s){return Object.assign({},s,{data:s.data||dataFb});});
+  var pack=(w&&w.pacchetto)||f.Pacchetto||'';
+  var dentro=function(d){d=(d||'').substring(0,10);return (!da||d>=da)&&(!a||d<=a);};
+  if(!ss.length){
+    if(!dentro(dataFb)) return 0;
+    var o=(w&&w.oreAddebitare!=null)?w.oreAddebitare:((w&&w.oreUsate!=null)?w.oreUsate:f.OreLavoro);
+    return parseFloat(o)||0;
+  }
+  return ss.filter(function(s){return dentro(s.data);}).reduce(function(t,s){
+    var fas=Array.isArray(s.fasceSovrapposte)?s.fasceSovrapposte
+      :(s.coefficiente!==undefined&&pack.toUpperCase().indexOf('SPOT')<0?[{coeff:parseFloat(s.coefficiente),minuti:csDurMin(s)}]
+      :csTAFasce(s.inizio||'',s.fine||'',s.data,pack));
+    return t+csTAOre(fas,csDurMin(s),s.coefficiente);
+  },0);
+}
+// Minuti addebitati di un RT Telefonico (campi come su SharePoint), se la data è in [da,a]
+function csConsumoTel(f, da, a){
+  var d=(f.DataIntervento||'').substring(0,10);
+  if((da&&d&&d<da)||(a&&d&&d>a)) return 0;
+  var ch=[], pack=f.Pacchetto||'', mu=null;
+  try{ var r=JSON.parse(f.ChiamateJSON||'{}');
+    if(Array.isArray(r)) ch=r; else { ch=r.chiamate||[]; if(r.pacchetto) pack=r.pacchetto; if(r.minutiUsati!=null) mu=parseFloat(r.minutiUsati); } }catch(e){}
+  var p=pack.toUpperCase(); if(p.indexOf('PREMIUM')>=0) return 0;
+  var tot=ch.reduce(function(s,c){return s+(parseFloat(c.durata)||0);},0);
+  if(tot===0&&mu!==null) tot=mu;
+  if(tot===0) tot=parseFloat(f.MinutiUsati)||0;
+  return p.indexOf('STANDARD')>=0?Math.ceil(tot):Math.ceil(tot/5)*5;
+}
+
+// Residuo di un pacchetto Telefonica/Teleassistenza, escluso il RT in modifica
+function rtMatchTipo(r,tipo){
+  if(tipo==='Teleassistenza') return r.tipo==='Teleassistenza';
+  if(tipo==='Telefonica') return r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
+  return false;
+}
+function residuoContratto(cliente,tipo,escludiId){
+  const c=getContratto(cliente,tipo);
+  const p=(c.pacchetto||'Spot').toUpperCase();
+  if(p==='SPOT'||(tipo==='Telefonica'&&p==='PREMIUM')) return null;
+  const da=(c.dataInizio||'').substring(0,10), a=(c.dataFine||'').substring(0,10);
+  const acq=tipo==='Telefonica'?(c.saldoMinuti||0):(c.saldoOre||0);
+  const cons=db.rapportini.filter(r=>r.cliente===cliente&&r.id!==escludiId&&rtMatchTipo(r,tipo))
+    .reduce((t,r)=>{const f=rtToSPFields(r);return t+(tipo==='Telefonica'?csConsumoTel(f,da,a):csConsumoTA(f,da,a));},0);
+  return {acq:acq,cons:cons,res:parseFloat((acq-cons).toFixed(2)),da:da,a:a};
+}
 
 // ══════════════════════════════════════
 // APERTURA DA TICKET (ANYMA-NET → "Crea rapportino")
@@ -1590,7 +1675,8 @@ let telChiamate=[];
 function initTelefonica(){
   const contr=getContratto(cRT.cliente,'Telefonica');
   cRT.pacchetto=contr.pacchetto;
-  cRT.saldoPrima=contr.saldoMinuti||0;
+  const _rTel=residuoContratto(cRT.cliente,'Telefonica',cRT.id);
+  cRT.saldoPrima=_rTel?_rTel.res:0;
   cRT.tipoServizio='Telefonica';
   // Ripristina chiamate esistenti o inizia con array vuoto
   telChiamate=(cRT.chiamate||[]).slice();
@@ -1609,8 +1695,8 @@ function aggiornaTelInfo(){
   const saldoEl=document.getElementById('telSaldo');
   if(pacEl) pacEl.textContent=contr.pacchetto||'Spot';
   if(saldoEl){
-    if(contr.pacchetto==='Spot'||contr.pacchetto==='Premium') saldoEl.textContent='N/A';
-    else saldoEl.textContent=(contr.saldoMinuti||0)+' min';
+    const _r=residuoContratto(cRT.cliente,'Telefonica',cRT.id);
+    saldoEl.textContent=_r?(_r.res+' min'):'N/A';
   }
   aggiornaTotaliTel();
 }
@@ -1629,8 +1715,10 @@ function aggiornaTotaliTel(){
   cRT.minutiUsati=totArr;
   // Saldo dopo
   let saldoDopo=null;
-  if(pac!=='Spot'&&pac!=='Premium'){
-    saldoDopo=Math.max(0,(contr.saldoMinuti||0)-totArr);
+  const _rT=residuoContratto(cRT.cliente,'Telefonica',cRT.id);
+  if(_rT){
+    const _cur=csConsumoTel(rtToSPFields(Object.assign({},cRT,{chiamate:telChiamate,pacchetto:pac})),'','');
+    saldoDopo=parseFloat((_rT.res-_cur).toFixed(2));
     cRT.saldoDopo=saldoDopo;
   }
   const elMin=document.getElementById('telTotMin');
@@ -1787,7 +1875,8 @@ function taFlatten(){
 function initTeleassistenza(){
   const contr=getContratto(cRT.cliente,'Teleassistenza');
   cRT.pacchetto=contr.pacchetto;
-  cRT.saldoPrima=contr.saldoOre||0;
+  const _rTA=residuoContratto(cRT.cliente,'Teleassistenza',cRT.id);
+  cRT.saldoPrima=_rTA?_rTA.res:0;
   cRT.tipoServizio='Teleassistenza';
   taGiornate=taGiornateFromRT();
   cRT.ta_data=cRT.ta_data||taGiornate[0]?.data||today();
@@ -1801,8 +1890,8 @@ function aggiornaTAInfo(){
   const saldoEl=document.getElementById('taSaldo');
   if(pacEl) pacEl.textContent=contr.pacchetto||'Spot';
   if(saldoEl){
-    if(contr.pacchetto==='Spot'||contr.pacchetto==='Premium') saldoEl.textContent='N/A';
-    else saldoEl.textContent=(contr.saldoOre||0)+' h';
+    const _r=residuoContratto(cRT.cliente,'Teleassistenza',cRT.id);
+    saldoEl.textContent=_r?(_r.res.toLocaleString('it-IT')+' h'):'N/A';
   }
   aggiornaTotaliTA();
 }
@@ -1824,8 +1913,11 @@ function aggiornaTotaliTA(){
   cRT.oreEffettive=totOre;
   // Saldo in ore (solo visualizzazione, non arrotondato)
   let saldoDopo=null;
-  if(pac!=='Spot'&&pac!=='Premium'){
-    saldoDopo=Math.max(0,(contr.saldoOre||0)-totOre);
+  const _rA=residuoContratto(cRT.cliente,'Teleassistenza',cRT.id);
+  if(_rA){
+    const _tg=taGiornate.map(g=>({data:g.data||'',sessioni:(g.sessioni||[]).map(x=>({...x}))}));
+    const _cur=csConsumoTA(rtToSPFields(Object.assign({},cRT,{taGiornate:_tg,sessioni:[],pacchetto:pac})),'','');
+    saldoDopo=parseFloat((_rA.res-_cur).toFixed(2));
     cRT.ta_saldoDopo=saldoDopo;
   }
   const elMin=document.getElementById('taTotMin');
@@ -3184,14 +3276,8 @@ async function salva(invia){
     }catch(e){console.warn('PDF upload error',e);}
   }
 
-  // Se Telefonica: aggiorna saldo contratto su SP
-  if(isTelefonica()&&cRT.minutiUsati>0){
-    spAggiornaSaldo(cRT.cliente,'Telefonica',cRT.minutiUsati).catch(()=>{});
-  }
-  // Teleassistenza: scala ore da contratto
-  if(cRT.tipo==='Teleassistenza'&&cRT.ta_oreUsate>0){
-    spAggiornaSaldo(cRT.cliente,'Teleassistenza',cRT.ta_oreUsate).catch(()=>{});
-  }
+  // Saldi dei pacchetti: non vengono più scritti su AnymaContratti.
+  // Sono calcolati come quantità acquistata − consumi dei RT (stessa regola in ANYMA-NET).
 
   if(invia){
     const toList=getAllSelectedEmails().filter(Boolean)||[emailDest].filter(Boolean);
