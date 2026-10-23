@@ -281,6 +281,17 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
 /* Watermark */
 .pdf-wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:900;color:rgba(139,26,26,.06);white-space:nowrap;pointer-events:none;font-family:'Barlow',Arial;letter-spacing:6px;z-index:1}
 
+
+/* Dashboard: pulsanti serie del grafico mensile */
+.dchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center}
+.dchip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:20px;border:1px solid var(--b2);background:var(--s2);color:var(--tx3);font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.dchip b{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--tx3)}
+.dchip-dot{width:9px;height:9px;border-radius:50%;background:var(--b2)}
+.dchip.on{color:var(--tx);border-color:var(--c,var(--cr))}
+.dchip.on b{color:var(--c,var(--tx))}
+.dchip.on .dchip-dot{background:var(--c)}
+.dchip.mode{padding:6px 12px}
+.dchip.mode.on{background:var(--crd);border-color:var(--cr);color:var(--tx)}
 </style>
   
 </head>
@@ -888,7 +899,8 @@ textarea.fc{resize:none;min-height:100px;line-height:1.6}
   <!-- Grafici -->
   <div class="card" style="margin-bottom:10px">
     <div class="stl" style="margin-bottom:10px">Andamento mensile</div>
-    <div style="position:relative;height:240px"><canvas id="chartMensile"></canvas></div>
+    <div id="chartMensileChips" class="dchips"></div>
+    <div style="position:relative;height:260px"><canvas id="chartMensile"></canvas></div>
     <div id="chartMensileVuoto" style="display:none;color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun rapportino nel periodo</div>
   </div>
   <div style="height:75px"></div>
@@ -1028,7 +1040,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v170';
+const APP_VERSION='v171';
 
 /* ══ CONSUMI PACCHETTI (codice identico in Rapportini e ANYMA-NET) ══
    Saldo = quantità acquistata nel contratto (SaldoOre / SaldoMinuti) − consumi dei RT nella validità.
@@ -5520,44 +5532,85 @@ function renderDashCharts(list){
     });
   }else if(ctxC){ctxC.parentElement.innerHTML+='<div style="color:var(--tx3);font-size:12px;text-align:center;padding:8px">Nessun dato</div>';}
 
-  // ── Andamento mensile: RT (barre) e ore intervento (linea) per i 12 mesi dell'anno selezionato ──
+  // ── Andamento mensile: serie selezionabili, 12 mesi dell'anno scelto ──
   destroyChart('mensile');
   if(typeof Chart==='undefined') return;
   const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   const annoSel=parseInt(document.getElementById('dashAnno')?.value)||new Date().getFullYear();
-  const rtMese=new Array(12).fill(0), oreMese=new Array(12).fill(0);
+  const z=()=>new Array(12).fill(0);
+  const M={rt:z(),loco:z(),viag:z(),ta:z(),tel:z()};
   list.forEach(r=>{
     const d=r.dataIntervento||r.giornate?.[0]?.data||r.ta_data||r.chiamate_data||(r.dataCreazione||'').substring(0,10);
     if(!d||parseInt(d.substring(0,4))!==annoSel) return;
     const m=parseInt(d.substring(5,7))-1; if(m<0||m>11) return;
-    rtMese[m]++;
+    M.rt[m]++;
     const isTF=r.tipo==='Assistenza Telefonica'||r.tipoServizio==='Telefonica';
-    oreMese[m]+= isTF ? (r._minTel??r.minutiUsati??0)/60
-      : (r.tipo==='Teleassistenza' ? (r._oreTA??r.ta_oreUsate??0)
-      : (r.giornate||[]).reduce((s,g)=>s+parseFloat(g.oreLav||0),0));
+    const isTA=r.tipo==='Teleassistenza';
+    if(isTF){ M.tel[m]+=(r._minTel??r.minutiUsati??0)/60; return; }
+    if(isTA){ M.ta[m]+=(r._oreTA??r.ta_oreUsate??0); return; }
+    (r.giornate||[]).forEach(g=>{ M.loco[m]+=parseFloat(g.oreLav||0); M.viag[m]+=parseFloat(g.oreViag||0); });
   });
-  const ctxM=document.getElementById('chartMensile');
-  const vuoto=document.getElementById('chartMensileVuoto');
-  const nessuno=rtMese.every(v=>v===0);
-  if(vuoto) vuoto.style.display=nessuno?'block':'none';
-  if(!ctxM||nessuno) return;
   const cs=getComputedStyle(document.documentElement);
   const cv=(n,f)=>(cs.getPropertyValue(n)||'').trim()||f;
-  const cBrand=cv('--brand','#c0392b'), cOre=cv('--success','#3ecf8e'), cTx=cv('--ink-3','#9a8878'), cGrid='rgba(255,255,255,.06)';
+  const SERIE=[
+    {k:'loco',l:'Ore lavoro',c:cv('--success','#3ecf8e')},
+    {k:'viag',l:'Ore viaggio',c:cv('--chart-travel','#a78bfa')},
+    {k:'ta',l:'Ore teleassistenza',c:cv('--service-ta','#06b6d4')},
+    {k:'tel',l:'Ore telefonica',c:cv('--service-tel','#f97316')},
+    {k:'rt',l:'N. rapportini',c:cv('--brand','#c0392b')}
+  ];
+  let sel, mode;
+  try{ sel=JSON.parse(localStorage.getItem('rt_dash_serie')||'null'); }catch(e){}
+  if(!Array.isArray(sel)||!sel.length) sel=['loco','viag','ta','tel','rt'];
+  mode=localStorage.getItem('rt_dash_mode')||'stack';
+  // pulsanti serie + modalità
+  const chips=document.getElementById('chartMensileChips');
+  if(chips){
+    const tot=k=>M[k].reduce((a,b)=>a+b,0);
+    chips.innerHTML=SERIE.map(s=>{
+      const on=sel.includes(s.k), t=s.k==='rt'?tot('rt'):tot(s.k).toFixed(1).replace('.',',')+' h';
+      return '<button class="dchip'+(on?' on':'')+'" style="--c:'+s.c+'" onclick="dashToggleSerie(\''+s.k+'\')"><span class="dchip-dot"></span>'+s.l+'<b>'+t+'</b></button>';
+    }).join('')+
+    '<span style="flex:1"></span>'+
+    '<button class="dchip mode'+(mode==='stack'?' on':'')+'" onclick="dashSetMode(\'stack\')">Barre</button>'+
+    '<button class="dchip mode'+(mode==='line'?' on':'')+'" onclick="dashSetMode(\'line\')">Linee</button>';
+  }
+  const ctxM=document.getElementById('chartMensile');
+  const vuoto=document.getElementById('chartMensileVuoto');
+  const nessuno=M.rt.every(v=>v===0);
+  if(vuoto) vuoto.style.display=nessuno?'block':'none';
+  if(!ctxM||nessuno) return;
+  const cTx=cv('--ink-3','#9a8878'), cGrid='rgba(255,255,255,.06)';
+  const ds=SERIE.filter(s=>sel.includes(s.k)).map(s=>{
+    const data=M[s.k].map(v=>+v.toFixed(2));
+    if(s.k==='rt') return {type:'line',label:s.l,data,borderColor:s.c,backgroundColor:s.c,borderDash:[4,3],pointRadius:3,yAxisID:'y1',order:0,cubicInterpolationMode:'monotone'};
+    return mode==='line'
+      ? {type:'line',label:s.l,data,borderColor:s.c,backgroundColor:s.c,pointRadius:3,yAxisID:'y',order:1,cubicInterpolationMode:'monotone'}
+      : {type:'bar',label:s.l,data,backgroundColor:s.c,borderRadius:3,yAxisID:'y',stack:'ore',order:2};
+  });
+  const hasRT=sel.includes('rt'), hasOre=sel.some(k=>k!=='rt');
   _charts['mensile']=new Chart(ctxM,{
-    data:{labels:MESI,datasets:[
-      {type:'bar',label:'Rapportini',data:rtMese,backgroundColor:cBrand,borderRadius:4,yAxisID:'y',order:2},
-      {type:'line',label:'Ore intervento',data:oreMese.map(v=>+v.toFixed(1)),borderColor:cOre,backgroundColor:cOre,cubicInterpolationMode:'monotone',pointRadius:3,yAxisID:'y1',order:1}
-    ]},
+    data:{labels:MESI,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:true,position:'top',labels:{color:cTx,font:{size:11},boxWidth:10}}},
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+(c.dataset.yAxisID==='y1'?c.parsed.y:c.parsed.y.toFixed(1).replace('.',',')+' h'),
+          footer:items=>{const s=items.filter(i=>i.dataset.yAxisID==='y').reduce((a,i)=>a+i.parsed.y,0);return s?'Totale ore: '+s.toFixed(1).replace('.',','):'';}}}},
       scales:{
-        x:{ticks:{color:cTx,font:{size:10}},grid:{display:false}},
-        y:{position:'left',beginAtZero:true,ticks:{color:cTx,font:{size:10},precision:0},grid:{color:cGrid},title:{display:true,text:'RT',color:cTx,font:{size:10}}},
-        y1:{position:'right',beginAtZero:true,ticks:{color:cTx,font:{size:10}},grid:{display:false},title:{display:true,text:'Ore',color:cTx,font:{size:10}}}
+        x:{stacked:mode==='stack',ticks:{color:cTx,font:{size:10}},grid:{display:false}},
+        y:{display:hasOre,stacked:mode==='stack',position:'left',beginAtZero:true,ticks:{color:cTx,font:{size:10}},grid:{color:cGrid},title:{display:true,text:'Ore',color:cTx,font:{size:10}}},
+        y1:{display:hasRT,position:'right',beginAtZero:true,ticks:{color:cTx,font:{size:10},precision:0},grid:{display:false},title:{display:true,text:'RT',color:cTx,font:{size:10}}}
       }}
   });
 }
+function dashToggleSerie(k){
+  let sel; try{ sel=JSON.parse(localStorage.getItem('rt_dash_serie')||'null'); }catch(e){}
+  if(!Array.isArray(sel)||!sel.length) sel=['loco','viag','ta','tel','rt'];
+  sel=sel.includes(k)?sel.filter(x=>x!==k):sel.concat(k);
+  if(!sel.length) sel=[k];  // almeno una serie visibile
+  try{ localStorage.setItem('rt_dash_serie',JSON.stringify(sel)); }catch(e){}
+  renderDash();
+}
+function dashSetMode(m){ try{ localStorage.setItem('rt_dash_mode',m); }catch(e){} renderDash(); }
 
 // ══════════════════════════════════════
 // TRANSLATE ATTIVITÀ (IT→EN via Claude API)

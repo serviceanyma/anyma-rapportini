@@ -2,7 +2,7 @@
    - pagina (index.html): prima la rete, se manca usa la copia salvata → aggiornamenti immediati e avvio offline
    - librerie, font, CSS condiviso: copia salvata subito, aggiornata in background
    - Microsoft 365 (login, Graph, SharePoint): mai salvati, passano sempre dalla rete */
-const VERSION = 'rt-v170';
+const VERSION = 'rt-v171';
 const SHELL = ['./', './index.html', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 const CDN = [
