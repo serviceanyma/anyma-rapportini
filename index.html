@@ -1041,7 +1041,9 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v174';
+const APP_VERSION='v175';
+// Ore decimali → h:mm (7,75 → 7:45)
+function fmtHM(v){ v=Math.max(0,+v||0); let h=Math.floor(v), m=Math.round((v-h)*60); if(m===60){h++;m=0;} return h+':'+String(m).padStart(2,'0'); }
 
 /* ══ CONSUMI PACCHETTI (codice identico in Rapportini e ANYMA-NET) ══
    Saldo = quantità acquistata nel contratto (SaldoOre / SaldoMinuti) − consumi dei RT nella validità.
@@ -5593,7 +5595,7 @@ function renderDashCharts(list){
   if(chips){
     const tot=k=>M[k].reduce((a,b)=>a+b,0);
     chips.innerHTML=SERIE.map(s=>{
-      const on=sel.includes(s.k), t=s.k==='rt'?tot('rt'):tot(s.k).toFixed(1).replace('.',',')+' h';
+      const on=sel.includes(s.k), t=s.k==='rt'?tot('rt'):fmtHM(tot(s.k))+' h';
       return '<button class="dchip'+(on?' on':'')+'" style="--c:'+s.c+'" onclick="dashToggleSerie(\''+s.k+'\')"><span class="dchip-dot"></span>'+s.l+'<b>'+t+'</b></button>';
     }).join('')+
     '<span style="flex:1"></span>'+
@@ -5618,8 +5620,8 @@ function renderDashCharts(list){
     data:{labels:LAB,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+(c.dataset.yAxisID==='y1'?c.parsed.y:c.parsed.y.toFixed(1).replace('.',',')+' h'),
-          footer:items=>{const s=items.filter(i=>i.dataset.yAxisID==='y').reduce((a,i)=>a+i.parsed.y,0);return s?'Totale ore: '+s.toFixed(1).replace('.',','):'';}}}},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+(c.dataset.yAxisID==='y1'?c.parsed.y:fmtHM(c.parsed.y)+' h'),
+          footer:items=>{const s=items.filter(i=>i.dataset.yAxisID==='y').reduce((a,i)=>a+i.parsed.y,0);return s?'Totale ore: '+fmtHM(s):'';}}}},
       scales:{
         x:{stacked:mode==='stack',ticks:{color:cTx,font:{size:10}},grid:{display:false}},
         y:{display:hasOre,stacked:mode==='stack',position:'left',beginAtZero:true,ticks:{color:cTx,font:{size:10}},grid:{color:cGrid},title:{display:true,text:'Ore',color:cTx,font:{size:10}}},
