@@ -43,6 +43,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);co
 .tb{background:var(--bg);border-bottom:1px solid var(--b1);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:relative;width:100%;box-sizing:border-box;}
 .tb-logo{display:flex;align-items:center;gap:9px}
 .tb-title{position:absolute;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:var(--tx3);letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap}
+@media(max-width:520px){.tb-title{display:none}} /* su telefono il titolo si sovrappone al logo: la sezione è già indicata nella barra in basso */
 
 /* SCREENS */
 .scr{display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:16px 16px 76px;flex-direction:column;-webkit-overflow-scrolling:touch;}
@@ -1027,7 +1028,7 @@ let _dashList=[]; // lista RT corrente per dettaglio cliente
     db.rapportini.forEach(r=>{if(r.tipo==='Supporto') r.tipo='Supporto / Assistenza';});
   }
 })();
-const APP_VERSION='v168';
+const APP_VERSION='v169';
 
 // ══════════════════════════════════════
 // APERTURA DA TICKET (ANYMA-NET → "Crea rapportino")
@@ -5070,7 +5071,6 @@ async function dashSyncSP(){
     const rts=db.rapportini;
     const totOre=rts.reduce((s,r)=>s+(r.giornate||[]).reduce((acc,g)=>acc+parseFloat(g.oreLav||0),0),0);
     console.log('RT caricati:',rts.length,'Ore totali:',totOre);
-    rts.forEach(r=>console.log(r.numRT,'tipo:',r.tipo,'giornate:',r.giornate?.length,'oreLav:',r.giornate?.[0]?.oreLav,'OreLavoro SP:',f.OreLavoro));
     toast(`✓ ${n} rapportini da SP — ${totOre.toFixed(1)}h totali`,'suc',5000);
   }catch(e){
     toast('⚠️ Errore sync SP: '+e.message,'err',6000);
